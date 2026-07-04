@@ -10,6 +10,7 @@ use socket2::{Socket, Domain, Type, Protocol};
 use crate::state::{AppState, PeerInfo};
 use crate::protocol::envelope::Envelope;
 use crate::protocol::heartbeat::HeartbeatPayload;
+use uuid::Uuid;
 
 const MULTICAST_IP: Ipv4Addr = Ipv4Addr::new(239, 255, 0, 1);
 const MULTICAST_PORT: u16 = 9000;
