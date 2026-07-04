@@ -30,3 +30,8 @@ dist-ssr
 /src-tauri/target/
 /src-tauri/target_a/
 /src-tauri/target_b/
+
+# Agent related files
+/.agent/
+/.agents/
+/skills-lock.json
