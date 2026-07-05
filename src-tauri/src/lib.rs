@@ -610,7 +610,7 @@ async fn get_peers(state: State<'_, Arc<AppState>>) -> Result<Vec<serde_json::Va
             "username": info.payload.username,
             "tcpPort": info.payload.tcp_port,
             "avatarId": info.payload.avatar_id,
-            "avatarBase64": null,
+            "avatarBase64": info.payload.avatar_base64,
             "os": info.payload.os,
             "ip": info.ip,
             "isOnline": info.is_online,

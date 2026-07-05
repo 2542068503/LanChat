@@ -161,6 +161,7 @@ async fn listen_loop(app_handle: AppHandle, state: Arc<AppState>) -> Result<(), 
 pub async fn broadcast_heartbeat(state: &AppState) {
     let username = state.username.read().await.clone();
     let avatar_id = *state.avatar_id.read().await;
+    let avatar_base64 = state.avatar_base64.read().await.clone();
     let tcp_port = *state.tcp_port.read().await;
     
     let payload = HeartbeatPayload {
@@ -168,6 +169,7 @@ pub async fn broadcast_heartbeat(state: &AppState) {
         username,
         tcp_port,
         avatar_id,
+        avatar_base64,
         os: std::env::consts::OS.to_string(),
     };
 
@@ -201,6 +203,7 @@ async fn broadcast_loop(state: Arc<AppState>) -> Result<(), Box<dyn std::error::
     loop {
         let username = state.username.read().await.clone();
         let avatar_id = *state.avatar_id.read().await;
+        let avatar_base64 = state.avatar_base64.read().await.clone();
         let tcp_port = *state.tcp_port.read().await;
         
         let payload = HeartbeatPayload {
@@ -208,6 +211,7 @@ async fn broadcast_loop(state: Arc<AppState>) -> Result<(), Box<dyn std::error::
             username,
             tcp_port,
             avatar_id,
+            avatar_base64,
             os: std::env::consts::OS.to_string(),
         };
 
@@ -298,7 +302,7 @@ pub fn emit_peers_update(app_handle: &AppHandle, peers: &HashMap<uuid::Uuid, Pee
             "username": info.payload.username,
             "tcpPort": info.payload.tcp_port,
             "avatarId": info.payload.avatar_id,
-            "avatarBase64": null,
+            "avatarBase64": info.payload.avatar_base64,
             "os": info.payload.os,
             "ip": info.ip,
             "isOnline": info.is_online,

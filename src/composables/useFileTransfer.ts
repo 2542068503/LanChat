@@ -297,18 +297,8 @@ export function useFileTransfer() {
             savePath: savePath
           });
           
-          // Set local path and clear downloading status reactively
-          if (chats.value[peerId]) {
-            const idx = chats.value[peerId].findIndex((m: any) => m.messageId === msg.messageId);
-            if (idx !== -1) {
-              chats.value[peerId][idx] = {
-                ...chats.value[peerId][idx],
-                localPath: savePath,
-                isDownloading: false
-              };
-            }
-          }
-          saveChatsToLocalStorage();
+          // 不在此处设置 localPath — 文件可能尚未写入完成
+          // download-success 事件会在文件实际写入后设置 localPath
         } catch (e) {
           console.error("Auto download failed", e);
           if (chats.value[peerId]) {

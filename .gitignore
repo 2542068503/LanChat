@@ -34,4 +34,6 @@ dist-ssr
 # Agent related files
 /.agent/
 /.agents/
+/.codegraph/
+/.reasonix/
 /skills-lock.json
