@@ -47,21 +47,25 @@ export function useFileTransfer() {
       
       // Update message object directly
       for (const peerId in chats.value) {
-        const msg = chats.value[peerId].find((m: any) => m.fileInfo?.fileId === fileId);
-        if (msg) {
-          msg.downloadBytesProcessed = bytesDownloaded;
-          msg.downloadTotalBytes = totalBytes;
+        const msgs = chats.value[peerId];
+        const idx = msgs.findIndex((m: any) => m.fileInfo?.fileId === fileId);
+        if (idx !== -1) {
+          const msg = msgs[idx];
+          const newMsg = { ...msg };
+          newMsg.downloadBytesProcessed = bytesDownloaded;
+          newMsg.downloadTotalBytes = totalBytes;
           
-          if (!msg.downloadStartTime) msg.downloadStartTime = Date.now();
-          const elapsedSeconds = (Date.now() - msg.downloadStartTime) / 1000;
+          if (!newMsg.downloadStartTime) newMsg.downloadStartTime = Date.now();
+          const elapsedSeconds = (Date.now() - newMsg.downloadStartTime) / 1000;
           if (elapsedSeconds > 0) {
             const bytesPerSec = bytesDownloaded / elapsedSeconds;
-            msg.downloadSpeed = formatSpeed(bytesPerSec);
+            newMsg.downloadSpeed = formatSpeed(bytesPerSec);
             if (bytesPerSec > 0) {
               const remainingSecs = Math.ceil((totalBytes - bytesDownloaded) / bytesPerSec);
-              msg.downloadEta = formatTime(remainingSecs);
+              newMsg.downloadEta = formatTime(remainingSecs);
             }
           }
+          msgs[idx] = newMsg;
           break;
         }
       }
@@ -111,17 +115,24 @@ export function useFileTransfer() {
       
       // Find the message in chats and update its localPath
       for (const peerId in chats.value) {
-        const msg = chats.value[peerId].find((m: any) => m.fileInfo?.fileId === fileId);
-        if (msg) {
-          msg.isDownloading = false;
-          msg.localPath = savePath;
-          fileName = msg.fileInfo?.name || "文件";
+        const msgs = chats.value[peerId];
+        const idx = msgs.findIndex((m: any) => m.fileInfo?.fileId === fileId);
+        if (idx !== -1) {
+          const currentMsg = msgs[idx];
+          msgs[idx] = {
+            ...currentMsg,
+            isDownloading: false,
+            localPath: savePath
+          };
+          fileName = currentMsg.fileInfo?.name || "文件";
         }
       }
       
       saveChatsToLocalStorage();
       
-      showToast(`${fileName} 下载成功！\n保存至: ${savePath}`, "success");
+      if (!savePath.includes("LanChat_Thumbnails")) {
+        showToast(`${fileName} 下载成功！\n保存至: ${savePath}`, "success");
+      }
     });
 
     await listen<any>("download-error", (event) => {
@@ -129,9 +140,13 @@ export function useFileTransfer() {
       downloadProgress.value.show = false;
       showToast(`下载失败: ${error}`, "error");
       for (const peerId in chats.value) {
-        const msg = chats.value[peerId].find((m: any) => m.fileInfo?.fileId === fileId);
-        if (msg) {
-          msg.isDownloading = false;
+        const msgs = chats.value[peerId];
+        const idx = msgs.findIndex((m: any) => m.fileInfo?.fileId === fileId);
+        if (idx !== -1) {
+          msgs[idx] = {
+            ...msgs[idx],
+            isDownloading: false
+          };
           break;
         }
       }
@@ -139,13 +154,13 @@ export function useFileTransfer() {
 
     await listen<any>("message-received", (event) => {
       setTimeout(() => {
-        autoDownloadImage(event.payload);
+        autoDownloadImage(event.payload, event.payload.senderId);
       }, 50);
     });
 
     await listen<any>("group-message-received", (event) => {
       setTimeout(() => {
-        autoDownloadImage(event.payload);
+        autoDownloadImage(event.payload, "lobby");
       }, 50);
     });
   };
@@ -251,37 +266,60 @@ export function useFileTransfer() {
     }
   };
 
-  const autoDownloadImage = async (msg: any) => {
+  const autoDownloadImage = async (msg: any, customPeerId?: string) => {
     if (msg.contentType === 'file' && msg.fileInfo) {
       const isImage = msg.fileInfo.name.match(/\.(jpg|jpeg|png|gif|webp)$/i);
       const isSmall = msg.fileInfo.size < 20 * 1024 * 1024;
       if (isImage && isSmall && !msg.localPath && !msg.isDownloading) {
+        const peerId = customPeerId || (msg.senderId === selfInfo.value?.id ? msg.peerId : (msg.peerId === 'lobby' ? 'lobby' : msg.senderId));
         
-        let actualMsg = msg;
-        const peerId = msg.senderId === selfInfo.value?.id ? msg.peerId : (msg.peerId === 'lobby' ? 'lobby' : msg.senderId);
+        // Mark as downloading in a reactive way
         if (chats.value[peerId]) {
-          const found = chats.value[peerId].find((m: any) => m.messageId === msg.messageId);
-          if (found) actualMsg = found;
+          const idx = chats.value[peerId].findIndex((m: any) => m.messageId === msg.messageId);
+          if (idx !== -1) {
+            chats.value[peerId][idx] = {
+              ...chats.value[peerId][idx],
+              isDownloading: true
+            };
+          }
         }
 
-        actualMsg.isDownloading = true;
         try {
           const { appCacheDir, join } = await import('@tauri-apps/api/path');
           const cacheDir = await appCacheDir();
-          const savePath = await join(cacheDir, "LanChat_Thumbnails", `${actualMsg.fileInfo.fileId}_${actualMsg.fileInfo.name}`);
+          const savePath = await join(cacheDir, "LanChat_Thumbnails", `${msg.fileInfo.fileId}_${msg.fileInfo.name}`);
           
           await invoke("download_file", {
-            peerId: actualMsg.senderId,
-            fileId: actualMsg.fileInfo.fileId,
-            fileName: actualMsg.fileInfo.name,
-            fileSize: actualMsg.fileInfo.size,
+            peerId: msg.senderId,
+            fileId: msg.fileInfo.fileId,
+            fileName: msg.fileInfo.name,
+            fileSize: msg.fileInfo.size,
             savePath: savePath
           });
-          actualMsg.localPath = savePath;
+          
+          // Set local path and clear downloading status reactively
+          if (chats.value[peerId]) {
+            const idx = chats.value[peerId].findIndex((m: any) => m.messageId === msg.messageId);
+            if (idx !== -1) {
+              chats.value[peerId][idx] = {
+                ...chats.value[peerId][idx],
+                localPath: savePath,
+                isDownloading: false
+              };
+            }
+          }
+          saveChatsToLocalStorage();
         } catch (e) {
           console.error("Auto download failed", e);
-        } finally {
-          actualMsg.isDownloading = false;
+          if (chats.value[peerId]) {
+            const idx = chats.value[peerId].findIndex((m: any) => m.messageId === msg.messageId);
+            if (idx !== -1) {
+              chats.value[peerId][idx] = {
+                ...chats.value[peerId][idx],
+                isDownloading: false
+              };
+            }
+          }
         }
       }
     }

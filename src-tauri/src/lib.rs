@@ -153,8 +153,8 @@ async fn validate_path(state: &AppState, path_str: &str) -> Result<PathBuf, Stri
         }
     }
     
-    // Check if the path is in the authorized config directory
-    if path.starts_with(&state.config_dir) {
+    // Check if the path is in the authorized config directory or cache directory
+    if path.starts_with(&state.config_dir) || path.starts_with(&state.cache_dir) {
         return Ok(path);
     }
     
@@ -689,8 +689,10 @@ pub fn run() {
             // Resolve AppData configuration directory and ensure it exists
             let config_dir = app_handle.path().app_config_dir().unwrap_or_else(|_| std::env::current_dir().unwrap());
             let _ = std::fs::create_dir_all(&config_dir);
+            let cache_dir = app_handle.path().app_cache_dir().unwrap_or_else(|_| std::env::current_dir().unwrap());
+            let _ = std::fs::create_dir_all(&cache_dir);
             
-            let state = Arc::new(AppState::new(config_dir));
+            let state = Arc::new(AppState::new(config_dir, cache_dir));
             app.manage(state.clone());
 
             // Start UDP discovery and TCP server

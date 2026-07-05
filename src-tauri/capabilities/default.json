@@ -14,6 +14,7 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-start-dragging",
     "core:window:allow-set-icon",
+    "core:window:allow-set-skip-taskbar",
     "core:image:allow-from-bytes",
     "core:tray:default",
     {

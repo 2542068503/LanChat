@@ -63,10 +63,11 @@ pub struct AppState {
     pub allowed_paths: RwLock<std::collections::HashSet<PathBuf>>,
     pub is_flashing: Mutex<bool>,
     pub config_dir: PathBuf,
+    pub cache_dir: PathBuf,
 }
 
 impl AppState {
-    pub fn new(config_dir: PathBuf) -> Self {
+    pub fn new(config_dir: PathBuf, cache_dir: PathBuf) -> Self {
         let profile_file = std::env::var("LANCHAT_PROFILE")
             .unwrap_or_else(|_| "lanchat_profile.json".to_string());
         let config_path = if PathBuf::from(&profile_file).is_absolute() {
@@ -104,6 +105,7 @@ impl AppState {
             allowed_paths: RwLock::new(std::collections::HashSet::new()),
             is_flashing: Mutex::new(false),
             config_dir,
+            cache_dir,
         }
     }
 
