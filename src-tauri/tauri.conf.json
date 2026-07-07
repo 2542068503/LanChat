@@ -1,0 +1,58 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "lanchat",
+  "version": "1.1.0",
+  "identifier": "com.zhangshiyan.lanchat",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "LanChat",
+        "width": 820,
+        "height": 620,
+        "minWidth": 720,
+        "minHeight": 520,
+        "decorations": false,
+        "transparent": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "**",
+          "**/*",
+          "C:/**",
+          "D:/**",
+          "E:/**",
+          "F:/**",
+          "G:/**",
+          "C:\\**",
+          "D:\\**",
+          "E:\\**",
+          "F:\\**",
+          "G:\\**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
