@@ -602,7 +602,7 @@ async fn send_group_message(
     if let Ok(socket) = tokio::net::UdpSocket::bind("0.0.0.0:0").await {
         let dest_addr = std::net::SocketAddr::from(([239, 255, 0, 1], 9000));
         if let Ok(envelope) = crate::protocol::envelope::Envelope::new("group_chat", &msg) {
-            if let Ok(bytes) = serde_json::to_vec(&envelope) {
+            if let Ok(bytes) = envelope.to_encrypted_bytes() {
                 let _ = socket.send_to(&bytes, &dest_addr).await;
             }
         }

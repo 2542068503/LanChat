@@ -150,51 +150,30 @@ fn get_local_ipv4s() -> Vec<Ipv4Addr> {
 
 /// Generate candidate IP addresses on adjacent subnets to scan.
 ///
-/// For each local IPv4 address in a private range:
-///   - 192.168.x.x → also scan 192.168.(x-1).1-254 and 192.168.(x+1).1-254
-///   - 10.x.y.z   → also scan 10.x.(y-1).1-254 and 10.x.(y+1).1-254
-///   - 172.(16-31).x.x → also scan adjacent third octets
+/// For each local IPv4 address, scan the 5 nearest /24 subnets on each side
+/// (±5 on the third octet) to discover peers on neighbouring subnets.
 ///
-/// This avoids scanning the public internet and focuses on common
-/// multi-subnet LAN configurations.
+/// Examples:
+///   - 6.101.88.136 → also scan 6.101.83-93.1-254
+///   - 192.168.1.5  → also scan 192.168.0-2.1-254 (subnet 1 is itself, skipped)
+///   - 10.0.5.10    → also scan 10.0.0-4,6-10.1-254
 fn generate_scan_targets(local_ips: &[Ipv4Addr]) -> Vec<Ipv4Addr> {
     let mut targets = Vec::new();
+    const RANGE: u8 = 5;
 
     for ip in local_ips {
         let octets = ip.octets();
 
-        // Determine subnet ranges based on the IP class
-        let adjacent_third_octets: Vec<u8> = if octets[0] == 10 {
-            // 10.x.y.z: scan 10.x.(y±1).0/24
-            vec![octets[2].wrapping_sub(1), octets[2].wrapping_add(1)]
-        } else if octets[0] == 192 && octets[1] == 168 {
-            // 192.168.x.y: scan 192.168.(x±1).0/24
-            vec![octets[2].wrapping_sub(1), octets[2].wrapping_add(1)]
-        } else if octets[0] == 172 && (16..=31).contains(&octets[1]) {
-            // 172.16-31.x.y: scan 172.(same).(x±1).0/24
-            vec![octets[2].wrapping_sub(1), octets[2].wrapping_add(1)]
-        } else {
-            // For other IPs (e.g., public IPs, uncommon private ranges),
-            // just scan the same /24 range as a best-effort attempt.
-            // (multicast already covers it, but this adds a unicast fallback)
-            vec![octets[2].wrapping_sub(0)]
-        };
-
-        for &third in &adjacent_third_octets {
-            // Skip the local subnet itself (covered by multicast)
-            if octets[0] == 10 && third == octets[2] {
-                continue;
-            }
-            if octets[0] == 192 && octets[1] == 168 && third == octets[2] {
-                continue;
-            }
-            if octets[0] == 172 && (16..=31).contains(&octets[1]) && third == octets[2] {
-                continue;
-            }
-
-            // Generate host IPs 1..254 in that subnet
-            for host in 1..=254u8 {
-                targets.push(Ipv4Addr::new(octets[0], octets[1], third, host));
+        // Scan ±RANGE subnets (±RANGE on the third octet)
+        for offset in 1..=RANGE {
+            for &third in &[
+                octets[2].wrapping_sub(offset),
+                octets[2].wrapping_add(offset),
+            ] {
+                // Generate host IPs 1..254 in that subnet
+                for host in 1..=254u8 {
+                    targets.push(Ipv4Addr::new(octets[0], octets[1], third, host));
+                }
             }
         }
     }
