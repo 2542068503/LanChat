@@ -159,7 +159,7 @@
           <img :src="globalAppIconUrl" style="width: 64px; height: 64px; border-radius: 8px; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
           <div style="display: flex; flex-direction: column; justify-content: center;">
             <h2 style="margin: 0; font-size: 20px; color: var(--text-primary);">LanChat</h2>
-            <div style="color: var(--text-secondary); font-size: 13px; opacity: 0.8;">v1.0.0 (Local Build)</div>
+            <div style="color: var(--text-secondary); font-size: 13px; opacity: 0.8;">v1.1.1 (Local Build)</div>
             <div style="color: var(--accent-color); font-size: 13px; margin-top: 4px; font-weight: 500;">开发者: zhangshiyan</div>
           </div>
         </div>
