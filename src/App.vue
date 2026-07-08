@@ -165,7 +165,7 @@ const stopResizeSidebar = () => {
 const { fetchSelfInfo, setupNetworkListeners, loadProfilesFromLocalStorage } = useNetwork();
 const { setupChatListeners, sendMessage, loadChatsFromLocalStorage } = useChat();
 const { setupFileListeners, selectAndShareFile, sendConfirmedFile, downloadFile, openFile, openImagePreview, autoDownloadImage } = useFileTransfer();
-const { initSettings, isDarkTheme, enableCtrlWClose } = useSettings();
+const { initSettings, isDarkTheme, enableCtrlWClose, silentStartup } = useSettings();
 
 watch(isMinimalMode, async (val) => {
   await appWindow.setSkipTaskbar(val);
@@ -297,6 +297,14 @@ onMounted(async () => {
   
   await fetchSelfInfo();
   initSettings();
+
+  if (!silentStartup.value) {
+    // Slight delay to prevent flickering during initial setup
+    setTimeout(async () => {
+      await appWindow.show();
+      await appWindow.setFocus();
+    }, 50);
+  }
 
   await setupNetworkListeners();
   await setupChatListeners();

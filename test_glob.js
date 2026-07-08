@@ -1,1 +1,0 @@
-const x = import.meta.glob('/public/presets/*', {eager:true});

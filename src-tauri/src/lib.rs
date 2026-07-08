@@ -599,11 +599,34 @@ async fn send_group_message(
         "quoteContent": quote_content,
     });
 
-    if let Ok(socket) = tokio::net::UdpSocket::bind("0.0.0.0:0").await {
-        let dest_addr = std::net::SocketAddr::from(([239, 255, 0, 1], 9000));
-        if let Ok(envelope) = crate::protocol::envelope::Envelope::new("group_chat", &msg) {
-            if let Ok(bytes) = envelope.to_encrypted_bytes() {
+    let dest_addr = std::net::SocketAddr::from(([239, 255, 0, 1], 9000));
+    if let Ok(envelope) = crate::protocol::envelope::Envelope::new("group_chat", &msg) {
+        if let Ok(bytes) = envelope.to_encrypted_bytes() {
+            if let Ok(interfaces) = local_ip_address::list_afinet_netifas() {
+                for (_name, ip) in interfaces {
+                    if let std::net::IpAddr::V4(ipv4) = ip {
+                        if !ipv4.is_loopback() {
+                            if let Ok(socket) = tokio::net::UdpSocket::bind(format!("{}:0", ipv4)).await {
+                                let _ = socket.send_to(&bytes, &dest_addr).await;
+                            }
+                        }
+                    }
+                }
+            }
+            // Fallback
+            if let Ok(socket) = tokio::net::UdpSocket::bind("0.0.0.0:0").await {
                 let _ = socket.send_to(&bytes, &dest_addr).await;
+                
+                // Unicast fallback for cross-subnet peers
+                let peers = state.online_peers.read().await;
+                for peer in peers.values() {
+                    if let Ok(ip) = peer.ip.parse::<std::net::Ipv4Addr>() {
+                        if crate::network::udp::is_cross_subnet(ip) {
+                            let dest = std::net::SocketAddr::from((ip, 9000));
+                            let _ = socket.send_to(&bytes, &dest).await;
+                        }
+                    }
+                }
             }
         }
     }
@@ -681,6 +704,16 @@ async fn get_network_details(state: State<'_, Arc<AppState>>) -> Result<serde_js
     }))
 }
 
+#[tauri::command]
+async fn add_peer_manual(state: State<'_, Arc<AppState>>, ip: String) -> Result<(), String> {
+    if let Ok(target) = ip.parse::<std::net::Ipv4Addr>() {
+        crate::network::scanner::send_unicast_heartbeat(state.inner(), target).await;
+        Ok(())
+    } else {
+        Err("无效的 IP 地址格式".to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -714,6 +747,12 @@ pub fn run() {
             network::start_tcp_server(app_handle.clone(), state.clone());
             // Start cross-subnet scanner (background, runs every 30s)
             network::start_subnet_scanner(app_handle.clone(), state.clone());
+            
+            if let Some(window) = app_handle.get_webview_window("main") {
+                if let Some(icon) = app_handle.default_window_icon().cloned() {
+                    let _ = window.set_icon(icon);
+                }
+            }
 
             // Build System Tray Menu
             let quit_i = tauri::menu::MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
@@ -873,7 +912,9 @@ pub fn run() {
             share_file_with_hash,
             write_text_file,
             read_text_file,
-            save_as_file
+            save_as_file,
+            add_peer_manual
+
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

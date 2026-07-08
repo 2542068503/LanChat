@@ -90,7 +90,7 @@ html, body {
   background-color: var(--window-bg);
   color: var(--text-primary);
   overflow: hidden;
-  border: 1px solid #202020;
+  border: none;
 }
 
 /* HANDWRITTEN DRAGGABLE TITLEBAR */
@@ -1977,7 +1977,7 @@ html, body {
   overflow-y: hidden;
 }
 
-/* 拖拽拉伸把手样式 */
+/* 鎷栨嫿鎷変几鎶婃墜鏍峰紡 */
 .resize-handle {
   width: 4px;
   background-color: var(--border-color);
@@ -1991,7 +1991,7 @@ html, body {
   background-color: var(--accent-color);
 }
 
-/* 自定义右键菜?*/
+/* 鑷畾涔夊彸閿彍?*/
 .custom-context-menu {
   position: fixed;
   background-color: #161619;
@@ -2026,7 +2026,7 @@ html, body {
   margin: 4px 0;
 }
 
-/* 置顶标签 */
+/* 缃《鏍囩 */
 .pin-icon-indicator {
   font-size: 11px;
   margin-right: 4px;
@@ -2034,7 +2034,7 @@ html, body {
   display: inline-block;
 }
 
-/* 文件发送确认弹?*/
+/* 鏂囦欢鍙戦€佺‘璁ゅ脊?*/
 .confirm-modal-card {
   width: 380px !important;
 }
@@ -2080,7 +2080,7 @@ html, body {
   color: var(--text-dark) !important;
 }
 
-/* 聊天输入框内 LaTeX 切换按钮 */
+/* 鑱婂ぉ杈撳叆妗嗗唴 LaTeX 鍒囨崲鎸夐挳 */
 .latex-checkbox-label {
   display: flex;
   align-items: center;
@@ -2096,7 +2096,7 @@ html, body {
   accent-color: var(--accent-color);
 }
 
-/* 全局偏好开?*/
+/* 鍏ㄥ眬鍋忓ソ寮€?*/
 .checkbox-settings-row {
   display: flex;
   flex-direction: column;
@@ -2117,7 +2117,7 @@ html, body {
   accent-color: var(--accent-color);
 }
 
-/* 字体大小预览 */
+/* 瀛椾綋澶у皬棰勮 */
 .font-size-preview {
   margin-top: 8px;
   padding: 10px;
@@ -2128,7 +2128,7 @@ html, body {
   line-height: 1.5;
 }
 
-/* 活跃网卡 IP 调试列表 */
+/* 娲昏穬缃戝崱 IP 璋冭瘯鍒楄〃 */
 .network-interfaces-group {
   margin-top: 10px;
 }
@@ -2315,7 +2315,7 @@ html, body {
   color: #1c1c1e;
 }
 
-/* 图片消息气泡内间距与布局优化 */
+/* 鍥剧墖娑堟伅姘旀场鍐呴棿璺濅笌甯冨眬浼樺寲 */
 .msg-bubble.image-bubble {
   padding: 0px;
   max-width: 320px;
@@ -2373,13 +2373,13 @@ html, body {
   font-weight: 400;
 }
 
-/* 浅色模式下图片气泡的特别适配 */
+/* 娴呰壊妯″紡涓嬪浘鐗囨皵娉＄殑鐗瑰埆閫傞厤 */
 .window-container.light .image-preview-card {
   background-color: #ffffff;
   border-color: #e5e5ea;
 }
 
-/* 浅色模式下，根据主题精调自己发送的消息气泡的底色和字色，防止白色看不清 */
+/* 娴呰壊妯″紡涓嬶紝鏍规嵁涓婚绮捐皟鑷繁鍙戦€佺殑娑堟伅姘旀场鐨勫簳鑹插拰瀛楄壊锛岄槻姝㈢櫧鑹茬湅涓嶆竻 */
 .window-container.light.silver-dark .message-wrapper.mine .msg-bubble { user-select: text;
   background-color: #e5e5ea;
   color: #1c1c1e;
@@ -2416,7 +2416,7 @@ html, body {
   border-color: transparent;
 }
 
-/* 浅色模式下文件卡片与弹窗文件名适配 */
+/* 娴呰壊妯″紡涓嬫枃浠跺崱鐗囦笌寮圭獥鏂囦欢鍚嶉€傞厤 */
 .window-container.light .file-card-action {
   border-top-color: #e5e5ea;
 }
@@ -2432,7 +2432,7 @@ html, body {
   color: #1c1c1e;
 }
 
-/* 浅色模式下聊天记录管理按钮与标题适配 */
+/* 娴呰壊妯″紡涓嬭亰澶╄褰曠鐞嗘寜閽笌鏍囬閫傞厤 */
 .window-container.light .settings-action-btn {
   background-color: #f2f2f7;
   color: #1c1c1e;
@@ -2462,7 +2462,7 @@ html, body {
   border-left-color: #18181b;
 }
 
-/* 浅色模式细节优化：消除黑色外边框与滑块重置，适配按钮、图标及状?*/
+/* 娴呰壊妯″紡缁嗚妭浼樺寲锛氭秷闄ら粦鑹插杈规涓庢粦鍧楅噸缃紝閫傞厤鎸夐挳銆佸浘鏍囧強鐘?*/
 .window-container.light {
   border-color: #d1d1d6;
 }
@@ -3166,4 +3166,10 @@ body:has(.window-container.minimal),
   min-width: 18px;
   text-align: center;
   box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+@keyframes gradientMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }

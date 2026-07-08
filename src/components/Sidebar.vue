@@ -5,6 +5,9 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
       </span>
       <input type="text" v-model="searchInput" placeholder="搜索联系人..." class="search-input" />
+      <button @click="promptAddPeer" title="手动添加跨网段IP" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; margin-left: 4px;">
+        <Plus :size="16" />
+      </button>
     </div>
 
     <div class="peers-list">
@@ -17,10 +20,17 @@
         @contextmenu.prevent="showContextMenu($event, peer)"
       >
         <div class="avatar-container">
-          <img v-if="peerProfiles[peer.id]?.avatarBase64 && peerProfiles[peer.id]?.avatarId === 0" :src="peerProfiles[peer.id].avatarBase64" class="peer-avatar-img" />
-          <div v-else class="peer-avatar-fallback" :style="getAvatarStyle(peerProfiles[peer.id]?.avatarId || 1)">
-            {{ getInitials(peerProfiles[peer.id]?.remark || peer.username) }}
-          </div>
+          <template v-if="peer.id === 'lobby'">
+            <div class="peer-avatar-fallback" style="background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 50%, #8b5cf6 100%); background-size: 200% 200%; color: white; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); border: 2px solid rgba(255, 255, 255, 0.2); animation: gradientMove 3s ease infinite;">
+              <Globe :size="22" stroke-width="1.5" />
+            </div>
+          </template>
+          <template v-else>
+            <img v-if="peerProfiles[peer.id]?.avatarBase64 && peerProfiles[peer.id]?.avatarId === 0" :src="peerProfiles[peer.id].avatarBase64" class="peer-avatar-img" />
+            <div v-else class="peer-avatar-fallback" :style="getAvatarStyle(peerProfiles[peer.id]?.avatarId || 1)">
+              {{ getInitials(peerProfiles[peer.id]?.remark || peer.username) }}
+            </div>
+          </template>
           <span class="status-indicator-dot" :class="peer.isOnline ? 'online' : 'offline'"></span>
         </div>
         
@@ -55,12 +65,23 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Pin } from 'lucide-vue-next';
-import { searchInput, peers, activePeerId, peerProfiles, unreadCounts, chats } from '../store';
+import { Pin, Globe, Plus } from 'lucide-vue-next';
+import { searchInput, peers, activePeerId, peerProfiles, unreadCounts, chats, showToast } from '../store';
 import type { Peer } from '../types';
 import { invoke } from '@tauri-apps/api/core';
 
 const emit = defineEmits(['change-tab', 'select-peer', 'show-detail']);
+
+function promptAddPeer() {
+  const ip = prompt("请输入要查找的跨网段好友 IP 地址 (例如: 10.10.1.5):");
+  if (ip && ip.trim()) {
+    invoke('add_peer_manual', { ip: ip.trim() }).then(() => {
+      showToast("已向目标 IP 发送探测信号", "success");
+    }).catch(e => {
+      showToast("添加失败: " + e, "error");
+    });
+  }
+}
 
 const filteredPeers = computed(() => {
   const query = searchInput.value.toLowerCase().trim();

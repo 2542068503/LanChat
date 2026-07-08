@@ -14,6 +14,7 @@ const defaultRenderLatex = ref(false);
 const enableCtrlWClose = ref(true);
 const appAccentColor = ref("#10b981");
 const autostartEnabled = ref(false);
+const silentStartup = ref(false);
 
 export function useSettings() {
   const { fetchSelfInfo } = useNetwork();
@@ -45,6 +46,11 @@ export function useSettings() {
     const savedCtrlW = localStorage.getItem("enableCtrlWClose");
     if (savedCtrlW) {
       enableCtrlWClose.value = savedCtrlW === "true";
+    }
+    
+    const savedSilent = localStorage.getItem("silentStartup");
+    if (savedSilent) {
+      silentStartup.value = savedSilent === "true";
     }
 
     const savedTheme = localStorage.getItem("appTheme");
@@ -194,6 +200,11 @@ export function useSettings() {
       document.body.classList.remove('dark-theme');
     }
   };
+  
+  const toggleSilentStartup = () => {
+    silentStartup.value = !silentStartup.value;
+    localStorage.setItem("silentStartup", silentStartup.value.toString());
+  };
 
   return {
     editUsername,
@@ -206,6 +217,7 @@ export function useSettings() {
     enableCtrlWClose,
     appAccentColor,
     autostartEnabled,
+    silentStartup,
     initSettings,
     loadAutostartStatus,
     toggleAutostart,
@@ -216,6 +228,7 @@ export function useSettings() {
     saveDefaultRenderLatex,
     saveCtrlWClose,
     toggleTheme,
+    toggleSilentStartup,
     setAccentColor
   };
 }

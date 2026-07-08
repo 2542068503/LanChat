@@ -130,14 +130,11 @@ async fn listen_loop(app_handle: AppHandle, state: Arc<AppState>) -> Result<(), 
                             
                             if changed {
                                 emit_peers_update(&app_handle, &*peers);
-                            }
-
-                            // Cross-subnet discovery: if the heartbeat came from
-                            // a different subnet, send our own heartbeat back as
-                            // a unicast reply so the peer can see us even though
-                            // our multicast broadcast won't reach their subnet.
-                            if let std::net::IpAddr::V4(src_v4) = src_addr.ip() {
-                                if is_cross_subnet(src_v4) {
+                                
+                                // Cross-subnet discovery / Manual Add: ONLY reply if this is a newly discovered 
+                                // or newly online peer to prevent infinite ping-pong packet storms.
+                                // We reply even if it's on the same subnet, in case multicast is blocked.
+                                if let std::net::IpAddr::V4(src_v4) = src_addr.ip() {
                                     let state_ref = state.clone();
                                     tauri::async_runtime::spawn(async move {
                                         scanner::send_unicast_heartbeat(&state_ref, src_v4).await;
@@ -190,6 +187,7 @@ pub async fn broadcast_heartbeat(state: &AppState) {
     if let Ok(envelope) = Envelope::new("heartbeat", &payload) {
         if let Ok(bytes) = envelope.to_encrypted_bytes() {
             let dest_addr = SocketAddr::from((MULTICAST_IP, MULTICAST_PORT));
+            let bcast_addr = SocketAddr::from(([255, 255, 255, 255], MULTICAST_PORT));
             
             // Broadcast on all active IPv4 interfaces
             if let Ok(interfaces) = local_ip_address::list_afinet_netifas() {
@@ -197,7 +195,9 @@ pub async fn broadcast_heartbeat(state: &AppState) {
                     if let std::net::IpAddr::V4(ipv4) = ip {
                         if !ipv4.is_loopback() {
                             if let Ok(socket) = UdpSocket::bind(format!("{}:0", ipv4)).await {
+                                let _ = socket.set_broadcast(true);
                                 let _ = socket.send_to(&bytes, &dest_addr).await;
+                                let _ = socket.send_to(&bytes, &bcast_addr).await;
                             }
                         }
                     }
@@ -205,7 +205,9 @@ pub async fn broadcast_heartbeat(state: &AppState) {
             }
             // Fallback
             if let Ok(socket) = UdpSocket::bind("0.0.0.0:0").await {
+                let _ = socket.set_broadcast(true);
                 let _ = socket.send_to(&bytes, &dest_addr).await;
+                let _ = socket.send_to(&bytes, &bcast_addr).await;
             }
         }
     }
@@ -231,13 +233,18 @@ async fn broadcast_loop(state: Arc<AppState>) -> Result<(), Box<dyn std::error::
 
         if let Ok(envelope) = Envelope::new("heartbeat", &payload) {
             if let Ok(bytes) = envelope.to_encrypted_bytes() {
+                let dest_addr = SocketAddr::from((MULTICAST_IP, MULTICAST_PORT));
+                let bcast_addr = SocketAddr::from(([255, 255, 255, 255], MULTICAST_PORT));
+                
                 // Broadcast on all active IPv4 interfaces
                 if let Ok(interfaces) = local_ip_address::list_afinet_netifas() {
                     for (_name, ip) in interfaces {
                         if let std::net::IpAddr::V4(ipv4) = ip {
                             if !ipv4.is_loopback() {
                                 if let Ok(socket) = UdpSocket::bind(format!("{}:0", ipv4)).await {
+                                    let _ = socket.set_broadcast(true);
                                     let _ = socket.send_to(&bytes, &dest_addr).await;
+                                    let _ = socket.send_to(&bytes, &bcast_addr).await;
                                 }
                             }
                         }
@@ -245,7 +252,9 @@ async fn broadcast_loop(state: Arc<AppState>) -> Result<(), Box<dyn std::error::
                 }
                 // Fallback
                 if let Ok(socket) = UdpSocket::bind("0.0.0.0:0").await {
+                    let _ = socket.set_broadcast(true);
                     let _ = socket.send_to(&bytes, &dest_addr).await;
+                    let _ = socket.send_to(&bytes, &bcast_addr).await;
                 }
             }
         }
@@ -310,7 +319,7 @@ pub async fn send_goodbye(state: &AppState) {
 
 /// Check if the given IPv4 address is on a different subnet from all local
 /// IPv4 addresses. Uses /24 subnet mask (most common for LANs).
-fn is_cross_subnet(remote: Ipv4Addr) -> bool {
+pub fn is_cross_subnet(remote: Ipv4Addr) -> bool {
     let remote_octets = remote.octets();
     if let Ok(interfaces) = local_ip_address::list_afinet_netifas() {
         for (_name, ip) in interfaces {

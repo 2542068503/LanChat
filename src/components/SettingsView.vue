@@ -97,10 +97,16 @@
         
         <div class="settings-field">
           <label class="settings-label">系统设置</label>
-          <label class="latex-toggle">
-            <input type="checkbox" :checked="autostartEnabled" @change="toggleAutostart">
-            <span class="latex-toggle-text">开机时自动启动 LanChat</span>
-          </label>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label class="latex-toggle">
+              <input type="checkbox" :checked="autostartEnabled" @change="toggleAutostart">
+              <span class="latex-toggle-text">开机时自动启动 LanChat</span>
+            </label>
+            <label class="latex-toggle">
+              <input type="checkbox" :checked="silentStartup" @change="toggleSilentStartup">
+              <span class="latex-toggle-text">启动后静默运行 (隐藏主窗口)</span>
+            </label>
+          </div>
         </div>
 
         <div class="settings-divider"></div>
@@ -159,7 +165,7 @@
           <img :src="globalAppIconUrl" style="width: 64px; height: 64px; border-radius: 8px; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
           <div style="display: flex; flex-direction: column; justify-content: center;">
             <h2 style="margin: 0; font-size: 20px; color: var(--text-primary);">LanChat</h2>
-            <div style="color: var(--text-secondary); font-size: 13px; opacity: 0.8;">v1.1.1 (Local Build)</div>
+            <div style="color: var(--text-secondary); font-size: 13px; opacity: 0.8;">v1.1.2 (Local Build)</div>
             <div style="color: var(--accent-color); font-size: 13px; margin-top: 4px; font-weight: 500;">开发者: zhangshiyan</div>
           </div>
         </div>
@@ -203,6 +209,7 @@ const {
   chatFontSize, globalFontSize, isDarkTheme, defaultRenderLatex,
   enableCtrlWClose,
   autostartEnabled,
+  silentStartup,
   appAccentColor,
   updateProfile,
   selectAndUploadAvatar,
@@ -211,6 +218,7 @@ const {
   saveDefaultRenderLatex,
   saveCtrlWClose,
   toggleAutostart,
+  toggleSilentStartup,
   toggleTheme,
   setAccentColor
 } = useSettings();

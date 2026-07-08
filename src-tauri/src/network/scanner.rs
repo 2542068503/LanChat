@@ -2,7 +2,6 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
-use tokio::sync::Semaphore;
 use tokio::time::sleep;
 use tauri::AppHandle;
 
@@ -10,12 +9,8 @@ use crate::state::AppState;
 use crate::protocol::envelope::Envelope;
 use crate::protocol::heartbeat::HeartbeatPayload;
 
-/// Maximum number of concurrent scan tasks
-const MAX_CONCURRENT_SCANS: usize = 50;
 /// How often the background scanner runs (in seconds)
 const SCAN_INTERVAL_SECS: u64 = 30;
-/// Timeout for TCP connect probes
-const TCP_TIMEOUT_MS: u64 = 500;
 /// The well-known LanChat UDP port used for discovery
 const DISCOVERY_PORT: u16 = 9000;
 
@@ -40,36 +35,63 @@ async fn run_scan(_app_handle: AppHandle, state: Arc<AppState>) -> Result<(), Bo
         return Ok(());
     }
 
-    let targets = generate_scan_targets(&local_ips);
-    if targets.is_empty() {
-        return Ok(());
-    }
-
-    // Build the heartbeat envelope once for this scan cycle
-    let heartbeat_bytes = build_heartbeat_bytes(&state).await;
-    let heartbeat_bytes = match heartbeat_bytes {
-        Some(b) => b,
+    let heartbeat_bytes = match build_heartbeat_bytes(&state).await {
+        Some(b) => Arc::new(b),
         None => return Ok(()),
     };
 
-    let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_SCANS));
-    let mut handles = Vec::new();
+    use socket2::{Socket, Domain, Type, Protocol};
+    let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
+    let _ = socket.set_send_buffer_size(4 * 1024 * 1024); // 4MB send buffer
+    socket.set_nonblocking(true)?;
+    socket.set_broadcast(true)?;
+    socket.bind(&"0.0.0.0:0".parse::<SocketAddr>().unwrap().into())?;
+    
+    let std_socket: std::net::UdpSocket = socket.into();
+    let udp = Arc::new(UdpSocket::from_std(std_socket)?);
 
-    for target in targets {
-        let permit = semaphore.clone().acquire_owned().await;
-        let bytes = heartbeat_bytes.clone();
-        let state_clone = state.clone();
+    let mut tasks = Vec::new();
 
-        handles.push(tauri::async_runtime::spawn(async move {
-            // Keep the permit for the duration of this task
-            let _permit = permit;
-            probe_target(target, bytes, &state_clone).await;
-        }));
+    for ip in local_ips {
+        let octets = ip.octets();
+        
+        // Fast scan the entire /16 (65535 IPs) using concurrent tasks per /24
+        for third in 0..=255u8 {
+            let udp_clone = udp.clone();
+            let bytes_clone = heartbeat_bytes.clone();
+            
+            tasks.push(tokio::spawn(async move {
+                // Send directed broadcast to this /24 subnet first
+                let bcast_ip = Ipv4Addr::new(octets[0], octets[1], third, 255);
+                let bcast_dest = SocketAddr::from((bcast_ip, DISCOVERY_PORT));
+                let _ = udp_clone.send_to(&bytes_clone, &bcast_dest).await;
+
+                for host in 1..=254u8 {
+                    let target_ip = Ipv4Addr::new(octets[0], octets[1], third, host);
+                    let dest = SocketAddr::from((target_ip, DISCOVERY_PORT));
+                    
+                    let mut retries = 0;
+                    while let Err(e) = udp_clone.send_to(&bytes_clone, &dest).await {
+                        // Yield if OS buffer is full or would block
+                        if e.raw_os_error() == Some(10055) || e.raw_os_error() == Some(10035) {
+                            if retries >= 5 {
+                                break; // Max retries exceeded
+                            }
+                            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+                            retries += 1;
+                        } else {
+                            // For other errors like NetworkUnreachable, we break out of the while loop and continue to the next IP
+                            break;
+                        }
+                    }
+                }
+            }));
+        }
     }
 
-    // Wait for all probes to complete
-    for handle in handles {
-        let _ = handle.await;
+    // Wait for all /24 subnet sweep tasks to complete
+    for t in tasks {
+        let _ = t.await;
     }
 
     Ok(())
@@ -99,40 +121,6 @@ async fn build_heartbeat_bytes(state: &AppState) -> Option<Vec<u8>> {
     None
 }
 
-/// Probe a single target IP:
-/// 1. Send UDP unicast heartbeat to port DISCOVERY_PORT
-/// 2. Try TCP connect to port DISCOVERY_PORT (fallback)
-async fn probe_target(target_ip: Ipv4Addr, heartbeat_bytes: Vec<u8>, _state: &AppState) {
-    // --- Method 1: UDP unicast heartbeat ---
-    // Bind to any available port and send our heartbeat directly to the target
-    if let Ok(socket) = UdpSocket::bind("0.0.0.0:0").await {
-        let dest = SocketAddr::from((target_ip, DISCOVERY_PORT));
-        let _ = socket.send_to(&heartbeat_bytes, &dest).await;
-        // Drop the socket so the port is freed immediately
-        drop(socket);
-    }
-
-    // --- Method 2: TCP connect probe (fallback when UDP is blocked) ---
-    // We try to connect to port DISCOVERY_PORT with a short timeout.
-    // If it succeeds, there's a host listening — but we don't get identity info
-    // from a bare TCP probe. The purpose is to verify liveness; actual peer
-    // discovery still relies on UDP heartbeat exchange.
-    let tcp_addr = SocketAddr::from((target_ip, DISCOVERY_PORT));
-    if let Ok(stream) = tokio::time::timeout(
-        Duration::from_millis(TCP_TIMEOUT_MS),
-        tokio::net::TcpStream::connect(tcp_addr),
-    )
-    .await
-    {
-        if let Ok(stream) = stream {
-            // TCP connected — host is alive. We can't get LanChat identity this way,
-            // but we note it. The real discovery happens via UDP heartbeat exchange.
-            // Close the connection immediately.
-            drop(stream);
-        }
-    }
-}
-
 /// Get all non-loopback IPv4 addresses on this machine.
 fn get_local_ipv4s() -> Vec<Ipv4Addr> {
     let mut result = Vec::new();
@@ -146,39 +134,6 @@ fn get_local_ipv4s() -> Vec<Ipv4Addr> {
         }
     }
     result
-}
-
-/// Generate candidate IP addresses on adjacent subnets to scan.
-///
-/// For each local IPv4 address, scan the 5 nearest /24 subnets on each side
-/// (±5 on the third octet) to discover peers on neighbouring subnets.
-///
-/// Examples:
-///   - 6.101.88.136 → also scan 6.101.83-93.1-254
-///   - 192.168.1.5  → also scan 192.168.0-2.1-254 (subnet 1 is itself, skipped)
-///   - 10.0.5.10    → also scan 10.0.0-4,6-10.1-254
-fn generate_scan_targets(local_ips: &[Ipv4Addr]) -> Vec<Ipv4Addr> {
-    let mut targets = Vec::new();
-    const RANGE: u8 = 5;
-
-    for ip in local_ips {
-        let octets = ip.octets();
-
-        // Scan ±RANGE subnets (±RANGE on the third octet)
-        for offset in 1..=RANGE {
-            for &third in &[
-                octets[2].wrapping_sub(offset),
-                octets[2].wrapping_add(offset),
-            ] {
-                // Generate host IPs 1..254 in that subnet
-                for host in 1..=254u8 {
-                    targets.push(Ipv4Addr::new(octets[0], octets[1], third, host));
-                }
-            }
-        }
-    }
-
-    targets
 }
 
 /// Send a unicast heartbeat reply to a specific IP address.
