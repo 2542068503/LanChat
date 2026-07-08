@@ -411,10 +411,12 @@ function sendMsg() {
   emit('send-message', { 
     content, 
     type: 'text', 
-    isLatex: useLatexForCurrentMessage.value 
+    isLatex: useLatexForCurrentMessage.value,
+    onSuccess: () => {
+      messageInput.value = "";
+      useLatexForCurrentMessage.value = defaultRenderLatex.value;
+    }
   });
-  messageInput.value = "";
-  useLatexForCurrentMessage.value = defaultRenderLatex.value;
 }
 
 function isImage(filename: string) {

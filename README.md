@@ -37,11 +37,25 @@ pnpm tauri dev
 pnpm tauri build
 ```
 
+## 📝 版本号修改指南
+
+在发布新版本前，您需要同步更新项目中的版本号。由于这是一个 Tauri 项目，需要同时更新前端和后端的版本号。
+
+主要需要修改以下 **3** 个文件：
+1. `package.json` (前端及 Node.js 依赖配置)
+2. `src-tauri/tauri.conf.json` (Tauri 构建配置)
+3. `src-tauri/Cargo.toml` (Rust 后端配置)
+
+**修改方法：手动修改**
+打开上述三个文件，将其中的 `"version": "x.x.x"` (或 `version = "x.x.x"`) 手动统一修改为您需要的新版本号。
+
+*(注：Tauri 目前没有官方内置的一键修改多文件版本号的命令，因此最稳妥的方法是手动或使用全局替换搜索进行更改)*
+
 ## 🤖 自动化构建与发布 (GitHub Actions)
 
 项目已配置 GitHub Actions 自动构建工作流。在您需要发布新版本时，只需执行以下操作：
 
-1. **修改版本号**：在 `package.json`、`src-tauri/tauri.conf.json` 以及 `src-tauri/Cargo.toml` 中修改版本。
+1. **更新版本号**：按照上方《版本号修改指南》修改并提交代码。
 2. **推送版本标签**：
    ```bash
    git tag v1.0.0

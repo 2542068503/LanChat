@@ -3,9 +3,11 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { 
   selfInfo, chats, activePeerId,
-  unreadCounts, currentTab, saveChatsToLocalStorage 
+  unreadCounts, currentTab, saveChatsToLocalStorage, getSenderProfile 
 } from '../store';
 import type { Message } from '../types';
+import { useSettings } from './useSettings';
+import { sendNotification } from '@tauri-apps/plugin-notification';
 
 export function useChat() {
   const loadChatsFromLocalStorage = () => {
@@ -54,8 +56,25 @@ export function useChat() {
       // Ensure lobby messages go to lobby
       if (msg.senderId !== selfInfo.value.id) {
         appendMessage(msg.senderId, msg);
-        if (currentTab.value !== 'chat' || activePeerId.value !== msg.senderId) {
+        if (currentTab.value !== 'chat' || activePeerId.value !== msg.senderId || !document.hasFocus()) {
           unreadCounts.value[msg.senderId] = (unreadCounts.value[msg.senderId] || 0) + 1;
+          
+          const { enableSystemNotification } = useSettings();
+          if (enableSystemNotification.value) {
+            const profile = getSenderProfile(msg.senderId, msg);
+            let bodyText = msg.contentType === 'text' ? msg.content : `[${msg.contentType}]`;
+            if (msg.contentType === 'file') bodyText = '[文件]';
+            else if (msg.contentType === 'image') bodyText = '[图片]';
+            
+            try {
+              sendNotification({
+                title: `${profile.username} 发来新消息`,
+                body: bodyText
+              });
+            } catch (e) {
+              console.warn("Failed to send notification", e);
+            }
+          }
         }
       }
     });
@@ -64,8 +83,25 @@ export function useChat() {
       const msg = event.payload;
       if (msg.senderId !== selfInfo.value.id) {
         appendMessage("lobby", msg);
-        if (currentTab.value !== 'chat' || activePeerId.value !== 'lobby') {
+        if (currentTab.value !== 'chat' || activePeerId.value !== 'lobby' || !document.hasFocus()) {
           unreadCounts.value['lobby'] = (unreadCounts.value['lobby'] || 0) + 1;
+          
+          const { enableSystemNotification } = useSettings();
+          if (enableSystemNotification.value) {
+            const profile = getSenderProfile(msg.senderId, msg);
+            let bodyText = msg.contentType === 'text' ? msg.content : `[${msg.contentType}]`;
+            if (msg.contentType === 'file') bodyText = '[文件]';
+            else if (msg.contentType === 'image') bodyText = '[图片]';
+            
+            try {
+              sendNotification({
+                title: `局域网大厅 - ${profile.username}`,
+                body: bodyText
+              });
+            } catch (e) {
+              console.warn("Failed to send notification", e);
+            }
+          }
         }
       }
     });

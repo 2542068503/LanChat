@@ -1,16 +1,16 @@
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::fs::OpenOptions;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, AsyncSeekExt, SeekFrom};
-use tokio::net::TcpStream;
 use tauri::{AppHandle, Emitter};
+use tokio::fs::OpenOptions;
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
+use tokio::net::TcpStream;
 use uuid::Uuid;
 
-use crate::state::AppState;
-use crate::protocol::envelope::Envelope;
-use crate::protocol::file::{FileRequestPayload, FileResponsePayload, FileChunkPayload};
-use crate::network::framing;
 use crate::crypto::sha;
+use crate::network::framing;
+use crate::protocol::envelope::Envelope;
+use crate::protocol::file::{FileChunkPayload, FileRequestPayload, FileResponsePayload};
+use crate::state::AppState;
 
 /// Handles an incoming file request on the sender side
 pub async fn handle_file_request(
@@ -21,15 +21,18 @@ pub async fn handle_file_request(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let req_res: Result<FileRequestPayload, _> = serde_json::from_value(payload_val.clone());
     let file_id = req_res.as_ref().map(|r| r.file_id).unwrap_or_default();
-    
+
     match handle_file_request_impl(stream, payload_val, state, app_handle.clone()).await {
         Ok(()) => Ok(()),
         Err(e) => {
             if !file_id.is_nil() {
-                let _ = app_handle.emit("upload-error", serde_json::json!({
-                    "fileId": file_id,
-                    "error": e.to_string()
-                }));
+                let _ = app_handle.emit(
+                    "upload-error",
+                    serde_json::json!({
+                        "fileId": file_id,
+                        "error": e.to_string()
+                    }),
+                );
             }
             Err(e)
         }
@@ -40,11 +43,11 @@ async fn handle_file_request_impl(
     mut stream: TcpStream,
     payload_val: serde_json::Value,
     state: Arc<AppState>,
-    app_handle: AppHandle
+    app_handle: AppHandle,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _ = stream.set_nodelay(true);
     let req: FileRequestPayload = serde_json::from_value(payload_val)?;
-    
+
     // 1. Look up file in shared files
     let shared_file = {
         let files = state.shared_files.read().await;
@@ -65,7 +68,7 @@ async fn handle_file_request_impl(
     }
 
     let file_info = shared_file.unwrap();
-    
+
     // 2. Open file and seek
     let mut file = match tokio::fs::File::open(&file_info.file_path).await {
         Ok(f) => f,
@@ -85,7 +88,7 @@ async fn handle_file_request_impl(
 
     let file_len = file_info.size;
     let start_offset = req.start_offset;
-    
+
     if start_offset > file_len {
         let resp = FileResponsePayload {
             status: "error".to_string(),
@@ -119,13 +122,16 @@ async fn handle_file_request_impl(
     let mut chunk_index = (start_offset / CHUNK_SIZE as u64) as u64;
 
     // Notify upload start
-    let _ = app_handle.emit("upload-progress", serde_json::json!({
-        "fileId": file_info.file_id,
-        "fileName": file_info.name,
-        "bytesUploaded": current_offset,
-        "totalBytes": file_len,
-        "status": "uploading"
-    }));
+    let _ = app_handle.emit(
+        "upload-progress",
+        serde_json::json!({
+            "fileId": file_info.file_id,
+            "fileName": file_info.name,
+            "bytesUploaded": current_offset,
+            "totalBytes": file_len,
+            "status": "uploading"
+        }),
+    );
 
     let mut last_emit = std::time::Instant::now();
 
@@ -137,7 +143,7 @@ async fn handle_file_request_impl(
 
         let chunk_data = &buffer[..count];
         let chunk_sha = sha::compute_sha256_bytes(chunk_data);
-        
+
         let chunk_meta = FileChunkPayload {
             file_id: file_info.file_id,
             index: chunk_index,
@@ -153,19 +159,22 @@ async fn handle_file_request_impl(
 
         // Write raw binary payload immediately
         stream.write_all(chunk_data).await?;
-        
+
         current_offset += count as u64;
         chunk_index += 1;
 
         // Throttled progress report (150ms)
         if last_emit.elapsed().as_millis() >= 150 {
-            let _ = app_handle.emit("upload-progress", serde_json::json!({
-                "fileId": file_info.file_id,
-                "fileName": file_info.name,
-                "bytesUploaded": current_offset,
-                "totalBytes": file_len,
-                "status": "uploading"
-            }));
+            let _ = app_handle.emit(
+                "upload-progress",
+                serde_json::json!({
+                    "fileId": file_info.file_id,
+                    "fileName": file_info.name,
+                    "bytesUploaded": current_offset,
+                    "totalBytes": file_len,
+                    "status": "uploading"
+                }),
+            );
             last_emit = std::time::Instant::now();
         }
     }
@@ -173,12 +182,15 @@ async fn handle_file_request_impl(
     stream.flush().await?;
 
     // Notify final success
-    let _ = app_handle.emit("upload-success", serde_json::json!({
-        "fileId": file_info.file_id,
-        "bytesUploaded": file_len,
-        "totalBytes": file_len,
-        "status": "success"
-    }));
+    let _ = app_handle.emit(
+        "upload-success",
+        serde_json::json!({
+            "fileId": file_info.file_id,
+            "bytesUploaded": file_len,
+            "totalBytes": file_len,
+            "status": "success"
+        }),
+    );
 
     Ok(())
 }
@@ -191,15 +203,28 @@ pub fn start_download(
     file_id: Uuid,
     file_name: String,
     file_size: u64,
-    save_path: String
+    save_path: String,
 ) {
     tauri::async_runtime::spawn(async move {
-        if let Err(e) = download_task(app_handle.clone(), state, peer_id, file_id, file_name.clone(), file_size, save_path.clone()).await {
+        if let Err(e) = download_task(
+            app_handle.clone(),
+            state,
+            peer_id,
+            file_id,
+            file_name.clone(),
+            file_size,
+            save_path.clone(),
+        )
+        .await
+        {
             eprintln!("Download task error for {}: {}", file_name, e);
-            let _ = app_handle.emit("download-error", serde_json::json!({
-                "fileId": file_id,
-                "error": e.to_string()
-            }));
+            let _ = app_handle.emit(
+                "download-error",
+                serde_json::json!({
+                    "fileId": file_id,
+                    "error": e.to_string()
+                }),
+            );
         }
     });
 }
@@ -211,7 +236,7 @@ async fn download_task(
     file_id: Uuid,
     file_name: String,
     file_size: u64,
-    save_path: String
+    save_path: String,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let clean_file_name = PathBuf::from(&file_name)
         .file_name()
@@ -222,7 +247,11 @@ async fn download_task(
     let save_path_buf = PathBuf::from(&save_path);
     for component in save_path_buf.components() {
         if let std::path::Component::ParentDir = component {
-            return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Access denied: path traversal attempt").into());
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "Access denied: path traversal attempt",
+            )
+            .into());
         }
     }
 
@@ -247,10 +276,13 @@ async fn download_task(
             } else if len == file_size {
                 // Already downloaded, just rename
                 tokio::fs::rename(&part_path, &save_path).await?;
-                let _ = app_handle.emit("download-success", serde_json::json!({
-                    "fileId": file_id,
-                    "savePath": save_path
-                }));
+                let _ = app_handle.emit(
+                    "download-success",
+                    serde_json::json!({
+                        "fileId": file_id,
+                        "savePath": save_path
+                    }),
+                );
                 return Ok(());
             } else {
                 // If local size is larger for some reason, truncate it
@@ -286,7 +318,7 @@ async fn download_task(
     // 5. Read Handshake Response
     let resp_bytes = framing::read_frame(&mut stream).await?;
     let resp_envelope = Envelope::from_encrypted_bytes(&resp_bytes)?;
-    
+
     if resp_envelope.v != 1 || resp_envelope.msg_type != "file_response" {
         return Err("Invalid file handshake response".into());
     }
@@ -302,19 +334,22 @@ async fn download_task(
         .write(true)
         .open(&part_path)
         .await?;
-        
+
     file.seek(SeekFrom::Start(start_offset)).await?;
 
     let mut bytes_downloaded = start_offset;
-    
+
     // Notify frontend download started/resumed
-    let _ = app_handle.emit("download-progress", serde_json::json!({
-        "fileId": file_id,
-        "fileName": clean_file_name.clone(),
-        "bytesDownloaded": bytes_downloaded,
-        "totalBytes": file_size,
-        "status": "downloading"
-    }));
+    let _ = app_handle.emit(
+        "download-progress",
+        serde_json::json!({
+            "fileId": file_id,
+            "fileName": clean_file_name.clone(),
+            "bytesDownloaded": bytes_downloaded,
+            "totalBytes": file_size,
+            "status": "downloading"
+        }),
+    );
 
     let mut last_emit = std::time::Instant::now();
 
@@ -323,13 +358,13 @@ async fn download_task(
         // Read metadata frame for chunk
         let chunk_meta_bytes = framing::read_frame(&mut stream).await?;
         let chunk_envelope = Envelope::from_encrypted_bytes(&chunk_meta_bytes)?;
-        
+
         if chunk_envelope.v != 1 || chunk_envelope.msg_type != "file_chunk" {
             return Err("Invalid file chunk header".into());
         }
 
         let chunk_meta: FileChunkPayload = serde_json::from_value(chunk_envelope.payload)?;
-        
+
         // Read raw binary bytes
         let mut chunk_data = vec![0u8; chunk_meta.size as usize];
         stream.read_exact(&mut chunk_data).await?;
@@ -351,13 +386,16 @@ async fn download_task(
 
         // Throttled progress report (150ms)
         if last_emit.elapsed().as_millis() >= 150 {
-            let _ = app_handle.emit("download-progress", serde_json::json!({
-                "fileId": file_id,
-                "fileName": clean_file_name.clone(),
-                "bytesDownloaded": bytes_downloaded,
-                "totalBytes": file_size,
-                "status": "downloading"
-            }));
+            let _ = app_handle.emit(
+                "download-progress",
+                serde_json::json!({
+                    "fileId": file_id,
+                    "fileName": clean_file_name.clone(),
+                    "bytesDownloaded": bytes_downloaded,
+                    "totalBytes": file_size,
+                    "status": "downloading"
+                }),
+            );
             last_emit = std::time::Instant::now();
         }
     }
@@ -366,22 +404,28 @@ async fn download_task(
     drop(file);
 
     // Emit final progress showing 100% downloaded
-    let _ = app_handle.emit("download-progress", serde_json::json!({
-        "fileId": file_id,
-        "fileName": clean_file_name.clone(),
-        "bytesDownloaded": file_size,
-        "totalBytes": file_size,
-        "status": "downloading"
-    }));
+    let _ = app_handle.emit(
+        "download-progress",
+        serde_json::json!({
+            "fileId": file_id,
+            "fileName": clean_file_name.clone(),
+            "bytesDownloaded": file_size,
+            "totalBytes": file_size,
+            "status": "downloading"
+        }),
+    );
 
     // 8. Rename part file to original path
     tokio::fs::rename(&part_path, &save_path).await?;
 
     // Emit final success
-    let _ = app_handle.emit("download-success", serde_json::json!({
-        "fileId": file_id,
-        "savePath": save_path
-    }));
+    let _ = app_handle.emit(
+        "download-success",
+        serde_json::json!({
+            "fileId": file_id,
+            "savePath": save_path
+        }),
+    );
 
     Ok(())
 }

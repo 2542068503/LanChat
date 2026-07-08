@@ -9,7 +9,7 @@ where
     let mut len_buf = [0u8; 4];
     reader.read_exact(&mut len_buf).await?;
     let len = u32::from_be_bytes(len_buf) as usize;
-    
+
     // Safety limit to prevent memory exhaustion (e.g., max 10MB JSON metadata)
     if len > 10 * 1024 * 1024 {
         return Err(io::Error::new(
@@ -17,7 +17,7 @@ where
             format!("Frame length {} exceeds maximum limit of 10MB", len),
         ));
     }
-    
+
     let mut payload = vec![0u8; len];
     reader.read_exact(&mut payload).await?;
     Ok(payload)

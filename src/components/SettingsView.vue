@@ -106,6 +106,10 @@
               <input type="checkbox" :checked="silentStartup" @change="toggleSilentStartup">
               <span class="latex-toggle-text">启动后静默运行 (隐藏主窗口)</span>
             </label>
+            <label class="latex-toggle">
+              <input type="checkbox" :checked="enableSystemNotification" @change="toggleSystemNotification">
+              <span class="latex-toggle-text">收到新消息时显示系统桌面通知</span>
+            </label>
           </div>
         </div>
 
@@ -165,7 +169,7 @@
           <img :src="globalAppIconUrl" style="width: 64px; height: 64px; border-radius: 8px; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
           <div style="display: flex; flex-direction: column; justify-content: center;">
             <h2 style="margin: 0; font-size: 20px; color: var(--text-primary);">LanChat</h2>
-            <div style="color: var(--text-secondary); font-size: 13px; opacity: 0.8;">v1.1.2 (Local Build)</div>
+            <div style="color: var(--text-secondary); font-size: 13px; opacity: 0.8;">v{{ appVersion }} (Local Build)</div>
             <div style="color: var(--accent-color); font-size: 13px; margin-top: 4px; font-weight: 500;">开发者: zhangshiyan</div>
           </div>
         </div>
@@ -191,7 +195,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { Building2, Rocket, FileText, Palette } from 'lucide-vue-next';
 import { useSettings } from '../composables/useSettings';
 import { selfInfo, showToast, globalAppIconUrl } from '../store';
@@ -210,6 +214,7 @@ const {
   enableCtrlWClose,
   autostartEnabled,
   silentStartup,
+  enableSystemNotification,
   appAccentColor,
   updateProfile,
   selectAndUploadAvatar,
@@ -219,9 +224,22 @@ const {
   saveCtrlWClose,
   toggleAutostart,
   toggleSilentStartup,
+  toggleSystemNotification,
   toggleTheme,
   setAccentColor
 } = useSettings();
+
+import { getVersion } from '@tauri-apps/api/app';
+
+const appVersion = ref('1.1.2');
+
+onMounted(async () => {
+  try {
+    appVersion.value = await getVersion();
+  } catch (e) {
+    console.error('Failed to get app version:', e);
+  }
+});
 
 const appIconInput = ref<HTMLInputElement | null>(null);
 const isUpdating = ref(false);

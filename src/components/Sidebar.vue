@@ -42,7 +42,9 @@
               </span>
               {{ peerProfiles[peer.id]?.remark || peer.username }}
             </span>
-            <span class="os-badge" :class="peerProfiles[peer.id]?.os?.toLowerCase()" v-if="peerProfiles[peer.id]?.os">{{ peerProfiles[peer.id].os }}</span>
+            <span class="os-badge" :class="formatOS(peerProfiles[peer.id]?.os)" v-if="peerProfiles[peer.id]?.os">{{ formatOS(peerProfiles[peer.id].os) }}</span>
+            <span v-if="peer.appState === 'active' && peer.isOnline" style="font-size: 10px; color: var(--accent-color); background: var(--chat-bg); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--border-color); margin-left: 4px;">活跃</span>
+            <span v-else-if="peer.appState === 'background' && peer.isOnline" style="font-size: 10px; color: var(--text-secondary); background: var(--window-bg); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--border-color); margin-left: 4px;">后台</span>
           </div>
           <div class="peer-status" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
             <span>{{ peer.ip || 'Local' }}</span>
@@ -54,11 +56,11 @@
       </div>
     </div>
 
-    <div v-if="contextMenu.show" class="context-menu" :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }">
-      <div class="menu-item" @click="handleContextAction('detail')">详细信息</div>
-      <div class="menu-item" @click="handleContextAction('pin')">{{ peerProfiles[contextMenu.peer?.id || '']?.isPinned ? '取消置顶' : '置顶联系人' }}</div>
-      <div class="menu-divider"></div>
-      <div class="menu-item danger" @click="handleContextAction('delete')">删除记录</div>
+    <div v-if="contextMenu.show" class="custom-context-menu" :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }">
+      <div class="context-item" @click="handleContextAction('detail')">详细信息</div>
+      <div class="context-item" @click="handleContextAction('pin')">{{ peerProfiles[contextMenu.peer?.id || '']?.isPinned ? '取消置顶' : '置顶联系人' }}</div>
+      <div class="context-divider"></div>
+      <div class="context-item danger" @click="handleContextAction('delete')">删除记录</div>
     </div>
   </div>
 </template>
@@ -187,5 +189,14 @@ function getInitials(name: string) {
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
   return trimmed.slice(0, 2).toUpperCase();
+}
+
+function formatOS(os: string | undefined | null) {
+  if (!os) return '';
+  const lower = os.toLowerCase();
+  if (lower.includes('win')) return 'win';
+  if (lower.includes('mac')) return 'mac';
+  if (lower.includes('linux')) return 'linux';
+  return os;
 }
 </script>

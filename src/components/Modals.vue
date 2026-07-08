@@ -50,12 +50,12 @@
             </div>
             <div class="details-row">
               <span class="details-label">操作系统</span>
-              <span class="details-val">{{ detailPeer.os || '未知' }}</span>
+              <span class="details-val">{{ formatOS(detailPeer.os) || '未知' }}</span>
             </div>
             <div class="details-row">
               <span class="details-label">当前状态</span>
               <span class="details-val" :class="detailPeer.isOnline ? 'online-txt' : 'offline-txt'">
-                {{ detailPeer.isOnline ? '在线' : '离线' }}
+                {{ detailPeer.isOnline ? (detailPeer.appState === 'active' ? '在线 (活跃)' : (detailPeer.appState === 'background' ? '在线 (后台)' : '在线')) : '离线' }}
               </span>
             </div>
             <div v-if="!detailPeer.isOnline" class="details-row">
@@ -304,5 +304,14 @@ function getAvatarStyle(id: number) {
     'linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)'
   ];
   return { background: colors[id % colors.length] || colors[0] };
+}
+
+function formatOS(os: string | undefined | null) {
+  if (!os) return '';
+  const lower = os.toLowerCase();
+  if (lower.includes('win')) return 'win';
+  if (lower.includes('mac')) return 'mac';
+  if (lower.includes('linux')) return 'linux';
+  return os;
 }
 </script>

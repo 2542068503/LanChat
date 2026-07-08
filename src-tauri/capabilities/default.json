@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "opener:default",
@@ -16,13 +18,19 @@
     "core:window:allow-start-dragging",
     "core:window:allow-set-icon",
     "core:window:allow-set-skip-taskbar",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
     "core:image:allow-from-bytes",
     "core:tray:default",
     {
       "identifier": "opener:allow-open-path",
       "allow": [
-        { "path": "**" }
+        {
+          "path": "**"
+        }
       ]
-    }
+    },
+    "notification:default"
   ]
 }

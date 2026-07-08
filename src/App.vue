@@ -230,7 +230,7 @@ function handleTitlebarDblClick(event: MouseEvent) {
 }
 
 function minimizeWindow() { appWindow.minimize(); }
-function closeWindow() { appWindow.close(); }
+function closeWindow() { appWindow.hide(); }
 async function toggleMaximizeWindow() {
   const isMax = await appWindow.isMaximized();
   if (isMax) {
@@ -260,7 +260,12 @@ async function handleSendMessage(payload: any) {
     replyTo.value = payload.msg;
   } else if (payload.type === 'text') {
     const success = await sendMessage(payload.content, "text", payload.isLatex, replyTo.value);
-    if (success) replyTo.value = null;
+    if (success) {
+      replyTo.value = null;
+      if (payload.onSuccess) payload.onSuccess();
+    } else {
+      showToast("发送失败，对方可能已离线", "error");
+    }
   }
 }
 

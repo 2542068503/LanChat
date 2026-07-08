@@ -9,6 +9,7 @@ export interface Peer {
   avatarId?: number;
   avatarBase64?: string;
   os?: string;
+  appState?: string;
 }
 
 export interface Profile {

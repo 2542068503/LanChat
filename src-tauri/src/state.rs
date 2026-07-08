@@ -1,11 +1,11 @@
-use serde::{Serialize, Deserialize};
+use crate::protocol::heartbeat::HeartbeatPayload;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
-use crate::protocol::heartbeat::HeartbeatPayload;
 
 #[derive(Debug, Clone)]
 pub struct PeerInfo {
@@ -62,23 +62,25 @@ pub struct AppState {
     pub shared_files: RwLock<HashMap<Uuid, SharedFile>>,
     pub allowed_paths: RwLock<std::collections::HashSet<PathBuf>>,
     pub is_flashing: Mutex<bool>,
+    pub is_focused: RwLock<bool>,
     pub config_dir: PathBuf,
     pub cache_dir: PathBuf,
 }
 
 impl AppState {
     pub fn new(config_dir: PathBuf, cache_dir: PathBuf) -> Self {
-        let profile_file = std::env::var("LANCHAT_PROFILE")
-            .unwrap_or_else(|_| "lanchat_profile.json".to_string());
+        let profile_file =
+            std::env::var("LANCHAT_PROFILE").unwrap_or_else(|_| "lanchat_profile.json".to_string());
         let config_path = if PathBuf::from(&profile_file).is_absolute() {
             PathBuf::from(profile_file)
         } else {
             config_dir.join(profile_file)
         };
-        
+
         let config = if config_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&config_path) {
-                serde_json::from_str::<ProfileConfig>(&content).unwrap_or_else(|_| Self::default_config())
+                serde_json::from_str::<ProfileConfig>(&content)
+                    .unwrap_or_else(|_| Self::default_config())
             } else {
                 Self::default_config()
             }
@@ -104,30 +106,32 @@ impl AppState {
             shared_files: RwLock::new(HashMap::new()),
             allowed_paths: RwLock::new(std::collections::HashSet::new()),
             is_flashing: Mutex::new(false),
+            is_focused: RwLock::new(true),
             config_dir,
             cache_dir,
         }
     }
 
     pub async fn save_peers(&self, peers: &HashMap<Uuid, PeerInfo>) -> Result<(), String> {
-        let saved_peers: Vec<PeerInfoSaved> = peers.values().map(|info| {
-            PeerInfoSaved {
+        let saved_peers: Vec<PeerInfoSaved> = peers
+            .values()
+            .map(|info| PeerInfoSaved {
                 payload: info.payload.clone(),
                 ip: info.ip.clone(),
                 last_seen_time: info.last_seen_time,
                 remark: info.remark.clone(),
                 is_pinned: info.is_pinned,
-            }
-        }).collect();
+            })
+            .collect();
 
-        let peers_file = std::env::var("LANCHAT_PEERS")
-            .unwrap_or_else(|_| "lanchat_peers.json".to_string());
+        let peers_file =
+            std::env::var("LANCHAT_PEERS").unwrap_or_else(|_| "lanchat_peers.json".to_string());
         let config_path = if PathBuf::from(&peers_file).is_absolute() {
             PathBuf::from(peers_file)
         } else {
             self.config_dir.join(peers_file)
         };
-        
+
         let content = serde_json::to_string_pretty(&saved_peers)
             .map_err(|e| format!("Failed to serialize peers: {}", e))?;
         std::fs::write(&config_path, content)
@@ -136,28 +140,31 @@ impl AppState {
     }
 
     pub fn load_peers(config_dir: &PathBuf) -> HashMap<Uuid, PeerInfo> {
-        let peers_file = std::env::var("LANCHAT_PEERS")
-            .unwrap_or_else(|_| "lanchat_peers.json".to_string());
+        let peers_file =
+            std::env::var("LANCHAT_PEERS").unwrap_or_else(|_| "lanchat_peers.json".to_string());
         let config_path = if PathBuf::from(&peers_file).is_absolute() {
             PathBuf::from(peers_file)
         } else {
             config_dir.join(peers_file)
         };
-        
+
         if config_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&config_path) {
                 if let Ok(saved) = serde_json::from_str::<Vec<PeerInfoSaved>>(&content) {
                     let mut map = HashMap::new();
                     for item in saved {
-                        map.insert(item.payload.id, PeerInfo {
-                            payload: item.payload,
-                            ip: item.ip,
-                            last_seen: Instant::now(),
-                            last_seen_time: item.last_seen_time,
-                            is_online: false, // Default to offline on startup
-                            remark: item.remark,
-                            is_pinned: item.is_pinned,
-                        });
+                        map.insert(
+                            item.payload.id,
+                            PeerInfo {
+                                payload: item.payload,
+                                ip: item.ip,
+                                last_seen: Instant::now(),
+                                last_seen_time: item.last_seen_time,
+                                is_online: false, // Default to offline on startup
+                                remark: item.remark,
+                                is_pinned: item.is_pinned,
+                            },
+                        );
                     }
                     return map;
                 }

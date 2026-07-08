@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
+import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 import { isEnabled, enable, disable } from '@tauri-apps/plugin-autostart';
 import { selfInfo, showToast } from '../store';
 import { useNetwork } from './useNetwork';
@@ -15,6 +16,7 @@ const enableCtrlWClose = ref(true);
 const appAccentColor = ref("#10b981");
 const autostartEnabled = ref(false);
 const silentStartup = ref(false);
+const enableSystemNotification = ref(true);
 
 export function useSettings() {
   const { fetchSelfInfo } = useNetwork();
@@ -57,6 +59,11 @@ export function useSettings() {
     if (savedTheme) {
       isDarkTheme.value = savedTheme === "dark";
       if (isDarkTheme.value) document.body.classList.add('dark-theme');
+    }
+
+    const savedNotification = localStorage.getItem("enableSystemNotification");
+    if (savedNotification) {
+      enableSystemNotification.value = savedNotification === "true";
     }
 
     const savedAccent = localStorage.getItem("appAccentColor");
@@ -206,6 +213,29 @@ export function useSettings() {
     localStorage.setItem("silentStartup", silentStartup.value.toString());
   };
 
+  const toggleSystemNotification = async () => {
+    enableSystemNotification.value = !enableSystemNotification.value;
+    localStorage.setItem("enableSystemNotification", enableSystemNotification.value.toString());
+    
+    if (enableSystemNotification.value) {
+      try {
+        let permissionGranted = await isPermissionGranted();
+        if (!permissionGranted) {
+          const permission = await requestPermission();
+          permissionGranted = permission === 'granted';
+          if (!permissionGranted) {
+            enableSystemNotification.value = false;
+            localStorage.setItem("enableSystemNotification", "false");
+            showToast("桌面通知权限被拒绝", "error");
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to request notification permission", e);
+      }
+    }
+  };
+
   return {
     editUsername,
     editAvatarId,
@@ -218,6 +248,7 @@ export function useSettings() {
     appAccentColor,
     autostartEnabled,
     silentStartup,
+    enableSystemNotification,
     initSettings,
     loadAutostartStatus,
     toggleAutostart,
@@ -229,6 +260,7 @@ export function useSettings() {
     saveCtrlWClose,
     toggleTheme,
     toggleSilentStartup,
+    toggleSystemNotification,
     setAccentColor
   };
 }

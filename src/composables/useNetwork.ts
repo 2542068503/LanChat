@@ -57,9 +57,11 @@ export function useNetwork() {
             
             peerProfiles.value[p.id] = {
               username: peerProfiles.value[p.id]?.remark || p.username,
-              avatarId: (p as any).avatarId || 1,
+              avatarId: typeof (p as any).avatarId === 'number' ? (p as any).avatarId : 1,
               avatarBase64: (p as any).avatarBase64 || undefined,
-              remark: peerProfiles.value[p.id]?.remark
+              remark: peerProfiles.value[p.id]?.remark,
+              os: (p as any).os,
+              isPinned: peerProfiles.value[p.id]?.isPinned
             };
           }
         }

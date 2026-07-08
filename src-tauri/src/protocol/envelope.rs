@@ -26,7 +26,10 @@ impl Envelope {
     pub fn verify(&self) -> bool {
         if let Some(ref t) = self.token {
             let payload_str = self.payload.to_string();
-            let input = format!("{}:{}:LANCHAT_SIGNATURE_SALT_2026", self.msg_type, payload_str);
+            let input = format!(
+                "{}:{}:LANCHAT_SIGNATURE_SALT_2026",
+                self.msg_type, payload_str
+            );
             let computed = crate::crypto::sha::compute_sha256_bytes(input.as_bytes());
             computed == *t
         } else {

@@ -11,7 +11,7 @@ pub struct ChatMessagePayload {
     pub timestamp: i64,
     pub file_info: Option<FileInfo>,
     pub render_latex: Option<bool>,
-    
+
     // Quote (Reply) support
     pub quote_msg_id: Option<Uuid>,
     pub quote_sender: Option<String>,

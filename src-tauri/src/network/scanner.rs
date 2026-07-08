@@ -1,13 +1,13 @@
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
+use tauri::AppHandle;
 use tokio::net::UdpSocket;
 use tokio::time::sleep;
-use tauri::AppHandle;
 
-use crate::state::AppState;
 use crate::protocol::envelope::Envelope;
 use crate::protocol::heartbeat::HeartbeatPayload;
+use crate::state::AppState;
 
 /// How often the background scanner runs (in seconds)
 const SCAN_INTERVAL_SECS: u64 = 30;
@@ -29,7 +29,10 @@ pub fn start_subnet_scanner(app_handle: AppHandle, state: Arc<AppState>) {
 }
 
 /// Run a single scan cycle: detect local subnets, generate targets, probe them.
-async fn run_scan(_app_handle: AppHandle, state: Arc<AppState>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn run_scan(
+    _app_handle: AppHandle,
+    state: Arc<AppState>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let local_ips = get_local_ipv4s();
     if local_ips.is_empty() {
         return Ok(());
@@ -40,13 +43,13 @@ async fn run_scan(_app_handle: AppHandle, state: Arc<AppState>) -> Result<(), Bo
         None => return Ok(()),
     };
 
-    use socket2::{Socket, Domain, Type, Protocol};
+    use socket2::{Domain, Protocol, Socket, Type};
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     let _ = socket.set_send_buffer_size(4 * 1024 * 1024); // 4MB send buffer
     socket.set_nonblocking(true)?;
     socket.set_broadcast(true)?;
     socket.bind(&"0.0.0.0:0".parse::<SocketAddr>().unwrap().into())?;
-    
+
     let std_socket: std::net::UdpSocket = socket.into();
     let udp = Arc::new(UdpSocket::from_std(std_socket)?);
 
@@ -54,12 +57,12 @@ async fn run_scan(_app_handle: AppHandle, state: Arc<AppState>) -> Result<(), Bo
 
     for ip in local_ips {
         let octets = ip.octets();
-        
+
         // Fast scan the entire /16 (65535 IPs) using concurrent tasks per /24
         for third in 0..=255u8 {
             let udp_clone = udp.clone();
             let bytes_clone = heartbeat_bytes.clone();
-            
+
             tasks.push(tokio::spawn(async move {
                 // Send directed broadcast to this /24 subnet first
                 let bcast_ip = Ipv4Addr::new(octets[0], octets[1], third, 255);
@@ -69,7 +72,7 @@ async fn run_scan(_app_handle: AppHandle, state: Arc<AppState>) -> Result<(), Bo
                 for host in 1..=254u8 {
                     let target_ip = Ipv4Addr::new(octets[0], octets[1], third, host);
                     let dest = SocketAddr::from((target_ip, DISCOVERY_PORT));
-                    
+
                     let mut retries = 0;
                     while let Err(e) = udp_clone.send_to(&bytes_clone, &dest).await {
                         // Yield if OS buffer is full or would block
@@ -99,18 +102,15 @@ async fn run_scan(_app_handle: AppHandle, state: Arc<AppState>) -> Result<(), Bo
 
 /// Build the encrypted heartbeat envelope bytes for sending to peers.
 async fn build_heartbeat_bytes(state: &AppState) -> Option<Vec<u8>> {
-    let username = state.username.read().await.clone();
-    let avatar_id = *state.avatar_id.read().await;
-    let avatar_base64 = state.avatar_base64.read().await.clone();
-    let tcp_port = *state.tcp_port.read().await;
-
+    let is_focused = *state.is_focused.read().await;
     let payload = HeartbeatPayload {
         id: state.peer_id,
-        username,
-        tcp_port,
-        avatar_id,
-        avatar_base64,
+        username: state.username.read().await.clone(),
+        tcp_port: *state.tcp_port.read().await,
+        avatar_id: *state.avatar_id.read().await,
+        avatar_base64: state.avatar_base64.read().await.clone(),
         os: std::env::consts::OS.to_string(),
+        app_state: Some(if is_focused { "active".to_string() } else { "background".to_string() }),
     };
 
     if let Ok(envelope) = Envelope::new("heartbeat", &payload) {
