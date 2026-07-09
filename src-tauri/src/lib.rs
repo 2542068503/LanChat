@@ -682,6 +682,28 @@ async fn toggle_peer_pin(
 }
 
 #[tauri::command]
+async fn save_settings(state: State<'_, Arc<AppState>>, settings: String) -> Result<(), String> {
+    let settings_file = std::env::var("LANCHAT_SETTINGS").unwrap_or_else(|_| "lanchat_settings.json".to_string());
+    let config_path = if std::path::PathBuf::from(&settings_file).is_absolute() {
+        std::path::PathBuf::from(settings_file)
+    } else {
+        state.config_dir.join(settings_file)
+    };
+    std::fs::write(&config_path, settings).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn load_settings(state: State<'_, Arc<AppState>>) -> Result<String, String> {
+    let settings_file = std::env::var("LANCHAT_SETTINGS").unwrap_or_else(|_| "lanchat_settings.json".to_string());
+    let config_path = if std::path::PathBuf::from(&settings_file).is_absolute() {
+        std::path::PathBuf::from(settings_file)
+    } else {
+        state.config_dir.join(settings_file)
+    };
+    std::fs::read_to_string(&config_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn get_network_details(state: State<'_, Arc<AppState>>) -> Result<serde_json::Value, String> {
     let interfaces = match local_ip_address::list_afinet_netifas() {
         Ok(list) => list
@@ -955,6 +977,8 @@ pub fn run() {
             write_text_file,
             read_text_file,
             save_as_file,
+            save_settings,
+            load_settings,
             add_peer_manual
         ])
         .run(tauri::generate_context!())

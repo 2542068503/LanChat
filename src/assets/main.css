@@ -457,6 +457,7 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
 }
 
 .peer-name {
@@ -466,34 +467,68 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+}
+
+.peer-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.state-badge {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  font-weight: 500;
+}
+
+.state-badge.active {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.state-badge.background {
+  color: var(--text-secondary);
+  background: rgba(128, 128, 128, 0.1);
+  border-color: rgba(128, 128, 128, 0.2);
 }
 
 .os-badge {
-  font-size: 7.5px;
-  padding: 1px 3px;
-  border-radius: 8px;
-  font-weight: bold;
-  display: inline-block;
-  vertical-align: middle;
-  transform: translateY(-1.5px);
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .os-badge.win {
-  background-color: rgba(36, 131, 213, 0.15);
-  color: #52a3f7;
-  border: 1px solid rgba(36, 131, 213, 0.25);
+  background-color: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.25);
 }
 
 .os-badge.mac {
-  background-color: rgba(255, 255, 255, 0.05);
-  color: #cccccc;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .os-badge.linux {
-  background-color: rgba(245, 158, 11, 0.15);
+  background-color: rgba(251, 191, 36, 0.15);
   color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.peer-item.active .os-badge,
+.peer-item.active .state-badge {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
 }
 
 .peer-status {

@@ -21,11 +21,29 @@ const enableSystemNotification = ref(true);
 export function useSettings() {
   const { fetchSelfInfo } = useNetwork();
 
-  const initSettings = () => {
+  const initSettings = async () => {
     editUsername.value = selfInfo.value.username;
     editAvatarId.value = selfInfo.value.avatarId;
     editAvatarBase64.value = selfInfo.value.avatarBase64 || null;
     
+    // Load backend settings
+    try {
+      const settingsStr = await invoke<string>("load_settings");
+      if (settingsStr) {
+        const settings = JSON.parse(settingsStr);
+        if (settings.chatFontSize) localStorage.setItem("chatFontSize", settings.chatFontSize);
+        if (settings.globalFontSize) localStorage.setItem("globalFontSize", settings.globalFontSize);
+        if (settings.defaultRenderLatex) localStorage.setItem("defaultRenderLatex", settings.defaultRenderLatex);
+        if (settings.enableCtrlWClose) localStorage.setItem("enableCtrlWClose", settings.enableCtrlWClose);
+        if (settings.silentStartup) localStorage.setItem("silentStartup", settings.silentStartup);
+        if (settings.appTheme) localStorage.setItem("appTheme", settings.appTheme);
+        if (settings.enableSystemNotification) localStorage.setItem("enableSystemNotification", settings.enableSystemNotification);
+        if (settings.appAccentColor) localStorage.setItem("appAccentColor", settings.appAccentColor);
+      }
+    } catch (e) {
+      console.log("No backend settings found, using local or defaults");
+    }
+
     // Load local settings
     const savedFontSize = localStorage.getItem("chatFontSize");
     if (savedFontSize) {
@@ -106,6 +124,7 @@ export function useSettings() {
   const setAccentColor = (color: string) => {
     appAccentColor.value = color;
     localStorage.setItem("appAccentColor", color);
+    syncSettings();
     document.documentElement.style.setProperty('--accent-color', color);
     
     // Calculate contrast text color
@@ -116,6 +135,22 @@ export function useSettings() {
     const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
     const textColor = (yiq >= 145) ? '#1c1c1e' : '#ffffff';
     document.documentElement.style.setProperty('--accent-text-color', textColor);
+  };
+
+  const syncSettings = () => {
+    const settings = {
+      chatFontSize: localStorage.getItem("chatFontSize"),
+      globalFontSize: localStorage.getItem("globalFontSize"),
+      defaultRenderLatex: localStorage.getItem("defaultRenderLatex"),
+      enableCtrlWClose: localStorage.getItem("enableCtrlWClose"),
+      silentStartup: localStorage.getItem("silentStartup"),
+      appTheme: localStorage.getItem("appTheme"),
+      enableSystemNotification: localStorage.getItem("enableSystemNotification"),
+      appAccentColor: localStorage.getItem("appAccentColor")
+    };
+    invoke("save_settings", { settings: JSON.stringify(settings) }).catch(e => {
+      console.error("Failed to sync settings", e);
+    });
   };
 
   const updateProfile = async () => {
@@ -180,27 +215,32 @@ export function useSettings() {
   };
 
   const saveFontSize = () => {
-    localStorage.setItem("chatFontSize", chatFontSize.value.toString());
     document.documentElement.style.setProperty('--chat-font-size', `${chatFontSize.value}px`);
+    localStorage.setItem("chatFontSize", chatFontSize.value.toString());
+    syncSettings();
   };
 
   const saveGlobalFontSize = () => {
-    localStorage.setItem("globalFontSize", globalFontSize.value.toString());
     document.documentElement.style.setProperty('--global-font-size', `${globalFontSize.value}px`);
     document.documentElement.style.setProperty('--global-zoom', (globalFontSize.value / 14).toString());
+    localStorage.setItem("globalFontSize", globalFontSize.value.toString());
+    syncSettings();
   };
 
   const saveDefaultRenderLatex = () => {
     localStorage.setItem("defaultRenderLatex", defaultRenderLatex.value.toString());
+    syncSettings();
   };
 
   const saveCtrlWClose = () => {
     localStorage.setItem("enableCtrlWClose", enableCtrlWClose.value.toString());
+    syncSettings();
   };
 
   const toggleTheme = () => {
     isDarkTheme.value = !isDarkTheme.value;
     localStorage.setItem("appTheme", isDarkTheme.value ? "dark" : "light");
+    syncSettings();
     if (isDarkTheme.value) {
       document.body.classList.add('dark-theme');
     } else {
@@ -211,11 +251,13 @@ export function useSettings() {
   const toggleSilentStartup = () => {
     silentStartup.value = !silentStartup.value;
     localStorage.setItem("silentStartup", silentStartup.value.toString());
+    syncSettings();
   };
 
   const toggleSystemNotification = async () => {
     enableSystemNotification.value = !enableSystemNotification.value;
     localStorage.setItem("enableSystemNotification", enableSystemNotification.value.toString());
+    syncSettings();
     
     if (enableSystemNotification.value) {
       try {

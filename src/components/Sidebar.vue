@@ -42,9 +42,11 @@
               </span>
               {{ peerProfiles[peer.id]?.remark || peer.username }}
             </span>
-            <span class="os-badge" :class="formatOS(peerProfiles[peer.id]?.os)" v-if="peerProfiles[peer.id]?.os">{{ formatOS(peerProfiles[peer.id].os) }}</span>
-            <span v-if="peer.appState === 'active' && peer.isOnline" style="font-size: 10px; color: var(--accent-color); background: var(--chat-bg); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--border-color); margin-left: 4px;">活跃</span>
-            <span v-else-if="peer.appState === 'background' && peer.isOnline" style="font-size: 10px; color: var(--text-secondary); background: var(--window-bg); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--border-color); margin-left: 4px;">后台</span>
+            <div class="peer-badges">
+              <span class="os-badge" :class="formatOS(peerProfiles[peer.id]?.os)" v-if="peerProfiles[peer.id]?.os">{{ formatOS(peerProfiles[peer.id].os) }}</span>
+              <span class="state-badge active" v-if="peer.appState === 'active' && peer.isOnline">活跃</span>
+              <span class="state-badge background" v-else-if="peer.appState === 'background' && peer.isOnline">后台</span>
+            </div>
           </div>
           <div class="peer-status" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
             <span>{{ peer.ip || 'Local' }}</span>

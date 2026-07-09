@@ -40,7 +40,9 @@ export function useChat() {
       nextTick(() => {
         scrollToBottom();
       });
+      return true;
     }
+    return false;
   };
 
   const scrollToBottom = () => {
@@ -55,8 +57,8 @@ export function useChat() {
       const msg = event.payload;
       // Ensure lobby messages go to lobby
       if (msg.senderId !== selfInfo.value.id) {
-        appendMessage(msg.senderId, msg);
-        if (currentTab.value !== 'chat' || activePeerId.value !== msg.senderId || !document.hasFocus()) {
+        const isNew = appendMessage(msg.senderId, msg);
+        if (isNew && (currentTab.value !== 'chat' || activePeerId.value !== msg.senderId || !document.hasFocus())) {
           unreadCounts.value[msg.senderId] = (unreadCounts.value[msg.senderId] || 0) + 1;
           
           const { enableSystemNotification } = useSettings();
@@ -82,8 +84,8 @@ export function useChat() {
     await listen<Message>("group-message-received", (event) => {
       const msg = event.payload;
       if (msg.senderId !== selfInfo.value.id) {
-        appendMessage("lobby", msg);
-        if (currentTab.value !== 'chat' || activePeerId.value !== 'lobby' || !document.hasFocus()) {
+        const isNew = appendMessage("lobby", msg);
+        if (isNew && (currentTab.value !== 'chat' || activePeerId.value !== 'lobby' || !document.hasFocus())) {
           unreadCounts.value['lobby'] = (unreadCounts.value['lobby'] || 0) + 1;
           
           const { enableSystemNotification } = useSettings();

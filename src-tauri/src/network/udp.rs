@@ -103,6 +103,7 @@ async fn listen_loop(
                                 if !existing.is_online
                                     || existing.payload.username != payload.username
                                     || existing.payload.avatar_id != payload.avatar_id
+                                    || existing.payload.app_state != payload.app_state
                                 {
                                     changed = true;
                                 }
@@ -280,7 +281,13 @@ async fn cleanup_loop(app_handle: AppHandle, state: Arc<AppState>) {
         let now = Instant::now();
 
         for (id, info) in peers.iter_mut() {
-            if info.is_online && now.duration_since(info.last_seen) > Duration::from_secs(45) {
+            let timeout = if info.payload.app_state.as_deref() == Some("background") {
+                Duration::from_secs(300) // 5 minutes for background apps (OS may throttle timers)
+            } else {
+                Duration::from_secs(60) // 60 seconds for active apps
+            };
+
+            if info.is_online && now.duration_since(info.last_seen) > timeout {
                 info.is_online = false;
                 changed = true;
 

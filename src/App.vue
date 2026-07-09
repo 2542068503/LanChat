@@ -324,6 +324,14 @@ onMounted(async () => {
     isMaximized.value = await appWindow.isMaximized();
   });
   
+  await appWindow.onFocusChanged(({ payload: focused }) => {
+    if (focused) {
+      if (currentTab.value === 'chat' && activePeerId.value) {
+        unreadCounts.value[activePeerId.value] = 0;
+      }
+    }
+  });
+
   // Custom context menu logic for blocking default
   document.addEventListener("contextmenu", handleContextMenu);
 
