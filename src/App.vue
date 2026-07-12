@@ -37,16 +37,23 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
           </button>
         </div>
+        <div class="sidebar-footer" style="margin-top: auto; margin-bottom: 38px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+          <button class="nav-tab-btn" v-show="currentTab === 'chat'" @click="isSidebarCollapsed = !isSidebarCollapsed" :title="isSidebarCollapsed ? '展开好友列表' : '收起好友列表'">
+            <PanelLeft v-if="isSidebarCollapsed" :size="20" />
+            <PanelLeftClose v-else :size="20" />
+          </button>
+        </div>
       </div>
 
       <div class="main-body-container">
-        <div class="chats-view-layout" v-if="currentTab === 'chat'">
+        <div class="chats-view-layout" v-show="currentTab === 'chat'">
           <Sidebar 
+            v-show="!isSidebarCollapsed"
             @select-peer="selectPeer" 
             @show-detail="showPeerDetail"
             :style="{ width: sidebarWidth + 'px' }"
           />
-          <div class="vertical-resizer" @mousedown="startResizeSidebar"></div>
+          <div class="vertical-resizer" v-show="!isSidebarCollapsed" @mousedown="startResizeSidebar"></div>
           <ChatArea  
             :replyTo="replyTo"
             @send-message="handleSendMessage"
@@ -55,15 +62,16 @@
             @download-file="downloadFile"
             @open-file="openFile"
             @select-share-file="selectAndShareFile"
+            @paste-image="sendClipboardImage"
             @show-detail="showPeerDetail"
           />
         </div>
-        <SettingsView v-else-if="currentTab === 'settings'" />
+        <SettingsView v-show="currentTab === 'settings'" />
       </div>
-      
-      <button v-if="currentTab === 'chat'" class="minimal-toggle-btn" @click="isMinimalMode = !isMinimalMode" :class="{ active: isMinimalMode }" title="极简/透明模式">
-        <EyeOff v-if="isMinimalMode" :size="16" />
-        <Eye v-else :size="16" />
+
+      <button v-show="currentTab === 'chat'" class="minimal-toggle-btn" @click="isMinimalMode = !isMinimalMode" :class="{ active: isMinimalMode }" title="极简/透明模式">
+        <EyeOff v-if="isMinimalMode" :size="20" />
+        <Eye v-else :size="20" />
       </button>
     </div>
 
@@ -109,9 +117,10 @@ import ChatArea from './components/ChatArea.vue';
 import SettingsView from './components/SettingsView.vue';
 import Modals from './components/Modals.vue';
 import type { Peer } from './types';
-import { Minus, Square, Copy, X, Eye, EyeOff } from 'lucide-vue-next';
+import { Minus, Square, Copy, X, Eye, EyeOff, PanelLeft, PanelLeftClose } from 'lucide-vue-next';
 
 const isMinimalMode = ref(false);
+const isSidebarCollapsed = ref(false);
 const appWindow = getCurrentWindow();
 
 // Global State refs for App.vue
@@ -164,7 +173,7 @@ const stopResizeSidebar = () => {
 
 const { fetchSelfInfo, setupNetworkListeners, loadProfilesFromLocalStorage } = useNetwork();
 const { setupChatListeners, sendMessage, loadChatsFromLocalStorage } = useChat();
-const { setupFileListeners, selectAndShareFile, sendConfirmedFile, downloadFile, openFile, openImagePreview, autoDownloadImage } = useFileTransfer();
+const { setupFileListeners, selectAndShareFile, sendConfirmedFile, sendClipboardImage, downloadFile, openFile, openImagePreview, autoDownloadImage } = useFileTransfer();
 const { initSettings, isDarkTheme, enableCtrlWClose, silentStartup } = useSettings();
 
 watch(isMinimalMode, async (val) => {

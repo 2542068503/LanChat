@@ -65,6 +65,7 @@ pub struct AppState {
     pub is_focused: RwLock<bool>,
     pub config_dir: PathBuf,
     pub cache_dir: PathBuf,
+    pub masquerade_icon: Mutex<Option<tauri::image::Image<'static>>>,
 }
 
 impl AppState {
@@ -109,6 +110,7 @@ impl AppState {
             is_focused: RwLock::new(true),
             config_dir,
             cache_dir,
+            masquerade_icon: Mutex::new(None),
         }
     }
 

@@ -8,13 +8,24 @@
         
         <div class="settings-field avatar-edit-area">
           <label class="settings-label">头像</label>
-          <div class="self-avatar-container" style="width: 50px; height: 50px; border-radius: 50%; border: none; overflow: hidden; cursor: pointer; flex-shrink: 0;" @click="selectAndUploadAvatar">
-            <img v-if="editAvatarBase64 && editAvatarId === 0" :src="editAvatarBase64" class="self-avatar-img" style="width: 100%; height: 100%; object-fit: cover;" />
-            <div v-else class="self-avatar-fallback" :style="[getAvatarStyle(editAvatarId || 1), { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '20px' }]">
-              {{ getInitials(editUsername) }}
+          <div style="display: flex; flex-direction: column; gap: 12px; flex: 1; width: 100%;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%;">
+              <div class="self-avatar-container" style="width: 50px; height: 50px; border-radius: 50%; border: none; overflow: hidden; cursor: pointer; flex-shrink: 0;" @click="selectAndUploadAvatar">
+                <img v-if="editAvatarBase64 && editAvatarId === 0" :src="editAvatarBase64" class="self-avatar-img" style="width: 100%; height: 100%; object-fit: cover;" />
+                <div v-else class="self-avatar-fallback" :style="[getAvatarStyle(editAvatarId || 1), { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '20px' }]">
+                  {{ getInitials(editUsername) }}
+                </div>
+              </div>
+              <button class="settings-upload-avatar-btn" @click="selectAndUploadAvatar">更换本地头像</button>
+            </div>
+            
+            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; width: 100%;">
+              <input type="text" v-model.trim="luoguUid" class="settings-input" placeholder="输入洛谷UID..." style="flex: 1; min-width: 0;" @keydown.enter="fetchLuoguAvatar" />
+              <button class="settings-upload-avatar-btn" @click="fetchLuoguAvatar" :disabled="!luoguUid || isFetchingLuogu" style="white-space: nowrap;">
+                {{ isFetchingLuogu ? '获取中...' : '获取洛谷头像' }}
+              </button>
             </div>
           </div>
-          <button class="settings-upload-avatar-btn" @click="selectAndUploadAvatar">更换头像</button>
         </div>
         
         <div class="settings-divider"></div>
@@ -106,9 +117,10 @@
               <input type="checkbox" :checked="silentStartup" @change="toggleSilentStartup">
               <span class="latex-toggle-text">启动后静默运行 (隐藏主窗口)</span>
             </label>
-            <label class="latex-toggle">
+            <label class="latex-toggle" style="display: flex; align-items: center;">
               <input type="checkbox" :checked="enableSystemNotification" @change="toggleSystemNotification">
               <span class="latex-toggle-text">收到新消息时显示系统桌面通知</span>
+              <button class="settings-btn-small" style="margin-left: 8px; padding: 2px 8px; font-size: 12px; border-radius: 4px; background-color: var(--primary-color); color: white; border: none; cursor: pointer; transition: opacity 0.2s; opacity: 0.8;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'" @click.stop.prevent="openNotificationSettings">去系统开启</button>
             </label>
           </div>
         </div>
@@ -199,13 +211,52 @@ import { ref, computed, onMounted } from 'vue';
 import { Building2, Rocket, FileText, Palette } from 'lucide-vue-next';
 import { useSettings } from '../composables/useSettings';
 import { selfInfo, showToast, globalAppIconUrl } from '../store';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { Image } from '@tauri-apps/api/image';
+import { invoke } from '@tauri-apps/api/core';
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+
+const luoguUid = ref("");
+const isFetchingLuogu = ref(false);
+
+const openNotificationSettings = async () => {
+  try {
+    await invoke('open_system_settings');
+  } catch (err: any) {
+    showToast('无法打开系统设置', 'error');
+  }
+};
+
+const fetchLuoguAvatar = async () => {
+  if (!luoguUid.value) return;
+  isFetchingLuogu.value = true;
+  try {
+    const url = `https://cdn.luogu.com.cn/upload/usericon/${luoguUid.value}.png`;
+    const response = await tauriFetch(url, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      showToast('获取洛谷头像失败，UID可能不存在', 'error');
+      return;
+    }
+    const buffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    const base64Str = btoa(binary);
+    editAvatarBase64.value = `data:image/png;base64,${base64Str}`;
+    editAvatarId.value = 0;
+    showToast('获取洛谷头像成功！', 'success');
+  } catch (err: any) {
+    showToast('获取洛谷头像失败: ' + err.message, 'error');
+  } finally {
+    isFetchingLuogu.value = false;
+  }
+};
 
 const presetFiles = import.meta.glob('../assets/presets/*.{png,jpg,jpeg,svg,ico,webp,gif}', { query: '?url', eager: true });
 const presetIcons = Object.values(presetFiles).map((mod: any) => mod.default);
 
-import { TrayIcon } from '@tauri-apps/api/tray';
 import defaultLogoUrl from '../assets/logo.png';
 
 const { 
@@ -269,22 +320,7 @@ async function handleUpdateProfile() {
 
 async function restoreDefaultIcon() {
   try {
-    const response = await fetch(defaultLogoUrl);
-    const buffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(buffer);
-    const image = await Image.fromBytes(uint8Array);
-    
-    const appWindow = getCurrentWindow();
-    await appWindow.setIcon(image);
-    
-    try {
-      const tray = await TrayIcon.getById('main-tray');
-      if (tray) {
-        await tray.setIcon(image);
-      }
-    } catch (err) {
-      console.warn("Tray icon update failed", err);
-    }
+    await invoke('set_masquerade_icon', { base64Data: null });
     
     globalAppIconUrl.value = defaultLogoUrl;
     showToast("应用图标已恢复", "success");
@@ -356,22 +392,21 @@ async function getRasterizedImageBytes(url: string, isSvg: boolean): Promise<Uin
   }
 }
 
+function uint8ArrayToBase64(bytes: Uint8Array) {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+}
+
 async function setPresetIcon(url: string) {
   try {
     const isSvg = url.toLowerCase().includes('.svg');
     const uint8Array = await getRasterizedImageBytes(url, isSvg);
-    const image = await Image.fromBytes(uint8Array);
-    const appWindow = getCurrentWindow();
-    await appWindow.setIcon(image);
-    
-    try {
-      const tray = await TrayIcon.getById('main-tray');
-      if (tray) {
-        await tray.setIcon(image);
-      }
-    } catch (err) {
-      console.warn("Tray icon update failed", err);
-    }
+    const base64Str = uint8ArrayToBase64(uint8Array);
+    await invoke('set_masquerade_icon', { base64Data: base64Str });
     
     globalAppIconUrl.value = url;
     showToast("应用图标已伪装", "success");
@@ -390,18 +425,8 @@ async function changeAppIcon(event: Event) {
     const fileUrl = URL.createObjectURL(file);
     const isSvg = file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg');
     const uint8Array = await getRasterizedImageBytes(fileUrl, isSvg);
-    const image = await Image.fromBytes(uint8Array);
-    const appWindow = getCurrentWindow();
-    await appWindow.setIcon(image);
-    
-    try {
-      const tray = await TrayIcon.getById('main-tray');
-      if (tray) {
-        await tray.setIcon(image);
-      }
-    } catch (err) {
-      console.warn("Tray icon update failed", err);
-    }
+    const base64Str = uint8ArrayToBase64(uint8Array);
+    await invoke('set_masquerade_icon', { base64Data: base64Str });
     
     // Create a temporary object URL for the UI display
     const blob = new Blob([uint8Array as any], { type: file.type });

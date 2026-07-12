@@ -2564,12 +2564,13 @@ html, body {
   font-family: inherit;
   line-height: 1.5;
   word-wrap: break-word;
+  white-space: normal;
 }
 .markdown-body p {
   margin-top: 0;
   margin-bottom: 8px;
 }
-.markdown-body p:last-child {
+.markdown-body > *:last-child {
   margin-bottom: 0;
 }
 .markdown-body code {
@@ -3117,15 +3118,15 @@ html, body {
 /* MINIMAL TRANSPARENT MODE */
 .minimal-toggle-btn {
   position: absolute;
-  bottom: 12px;
-  left: 12px;
+  bottom: 15px;
+  left: 9px;
   z-index: 100;
   background: rgba(0, 0, 0, 0.2);
   border: none;
   color: var(--text-secondary);
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -179,7 +179,7 @@ export function useSettings() {
       if (!filePath) return;
       
       const rawBase64 = await invoke<string>("read_file_base64", { filePath });
-      const resizedBase64 = await resizeImageBase64("data:image/jpeg;base64," + rawBase64);
+      const resizedBase64 = await resizeImageBase64("data:image/png;base64," + rawBase64);
       
       editAvatarBase64.value = resizedBase64;
       editAvatarId.value = 0; 
@@ -208,7 +208,7 @@ export function useSettings() {
         const sy = (img.height - minDim) / 2;
         
         ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, 64, 64);
-        resolve(canvas.toDataURL("image/jpeg", 0.7));
+        resolve(canvas.toDataURL("image/png"));
       };
       img.onerror = (e) => reject(e);
     });

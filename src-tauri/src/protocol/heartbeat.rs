@@ -11,4 +11,5 @@ pub struct HeartbeatPayload {
     pub avatar_base64: Option<String>,
     pub os: String,
     pub app_state: Option<String>,
+    pub version: Option<String>,
 }

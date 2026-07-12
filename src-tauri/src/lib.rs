@@ -466,8 +466,6 @@ pub fn start_tray_flashing(app_handle: AppHandle, state: Arc<AppState>) {
             *flashing = true;
         }
 
-        let default_icon = app_handle.default_window_icon().cloned();
-
         // Load custom message icon
         let msg_icon_bytes = include_bytes!("../icons/chat_msg.png");
         let msg_icon = tauri::image::Image::from_bytes(msg_icon_bytes).ok();
@@ -475,13 +473,20 @@ pub fn start_tray_flashing(app_handle: AppHandle, state: Arc<AppState>) {
         let mut show_msg_icon = true;
 
         loop {
+            let base_icon = {
+                let mask = state.masquerade_icon.lock().await;
+                mask.clone().or_else(|| app_handle.default_window_icon().cloned())
+            };
+
             // Check if we should stop flashing
             {
                 let flashing = state.is_flashing.lock().await;
                 if !*flashing {
-                    // Restore default icon before exiting
+                    // Restore base icon before exiting
                     if let Some(tray) = app_handle.tray_by_id("main-tray") {
-                        let _ = tray.set_icon(default_icon);
+                        if let Some(icon) = base_icon {
+                            let _ = tray.set_icon(Some(icon));
+                        }
                     }
                     break;
                 }
@@ -489,9 +494,13 @@ pub fn start_tray_flashing(app_handle: AppHandle, state: Arc<AppState>) {
 
             if let Some(tray) = app_handle.tray_by_id("main-tray") {
                 if show_msg_icon {
-                    let _ = tray.set_icon(msg_icon.clone());
+                    if let Some(icon) = msg_icon.clone() {
+                        let _ = tray.set_icon(Some(icon));
+                    }
                 } else {
-                    let _ = tray.set_icon(default_icon.clone());
+                    if let Some(icon) = base_icon {
+                        let _ = tray.set_icon(Some(icon));
+                    }
                 }
             }
 
@@ -504,14 +513,77 @@ pub fn start_tray_flashing(app_handle: AppHandle, state: Arc<AppState>) {
 pub fn stop_tray_flashing(app_handle: AppHandle, state: Arc<AppState>) {
     tauri::async_runtime::spawn(async move {
         let mut flashing = state.is_flashing.lock().await;
+        if !*flashing {
+            return;
+        }
         *flashing = false;
 
-        // Restore default icon
+        let base_icon = {
+            let mask = state.masquerade_icon.lock().await;
+            mask.clone().or_else(|| app_handle.default_window_icon().cloned())
+        };
+
+        // Restore base icon
         if let Some(tray) = app_handle.tray_by_id("main-tray") {
-            let default_icon = app_handle.default_window_icon().cloned();
-            let _ = tray.set_icon(default_icon);
+            if let Some(icon) = base_icon {
+                let _ = tray.set_icon(Some(icon));
+            }
         }
     });
+}
+
+#[tauri::command]
+async fn set_masquerade_icon(
+    state: State<'_, Arc<AppState>>,
+    app_handle: AppHandle,
+    base64_data: Option<String>,
+) -> Result<(), String> {
+    use base64::Engine;
+    
+    let mut masquerade = state.masquerade_icon.lock().await;
+    
+    if let Some(base64) = base64_data {
+        // Handle potential data URI prefix e.g. "data:image/png;base64,"
+        let b64_str = if base64.contains(',') {
+            base64.split(',').nth(1).unwrap_or(&base64).to_string()
+        } else {
+            base64
+        };
+        
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(&b64_str)
+            .map_err(|e| format!("Failed to decode base64: {}", e))?;
+            
+        let icon = tauri::image::Image::from_bytes(&decoded)
+            .map_err(|e| format!("Failed to parse image: {}", e))?;
+            
+        *masquerade = Some(icon.clone());
+        
+        if let Some(tray) = app_handle.tray_by_id("main-tray") {
+            let _ = tray.set_icon(Some(icon.clone()));
+        }
+        
+        if let Some(window) = app_handle.get_webview_window("main") {
+            let _ = window.set_icon(icon);
+        }
+    } else {
+        *masquerade = None;
+        let default_icon = app_handle.default_window_icon().cloned();
+        
+        if let Some(tray) = app_handle.tray_by_id("main-tray") {
+            if let Some(icon) = default_icon.clone() {
+                let _ = tray.set_icon(Some(icon));
+            }
+        }
+        
+        if let Some(window) = app_handle.get_webview_window("main") {
+            if let Some(icon) = default_icon.clone() {
+                let _ = window.set_icon(icon);
+            }
+        }
+    }
+    
+    Ok(())
 }
 
 #[tauri::command]
@@ -637,6 +709,78 @@ async fn send_group_message(
 }
 
 #[tauri::command]
+async fn save_clipboard_image(
+    state: State<'_, Arc<AppState>>,
+    base64_data: String,
+) -> Result<String, String> {
+    use base64::{engine::general_purpose, Engine as _};
+    
+    // Format is likely "data:image/png;base64,..."
+    let b64 = if let Some(stripped) = base64_data.strip_prefix("data:image/png;base64,") {
+        stripped
+    } else if let Some(stripped) = base64_data.strip_prefix("data:image/jpeg;base64,") {
+        stripped
+    } else {
+        &base64_data
+    };
+
+    let bytes = general_purpose::STANDARD
+        .decode(b64)
+        .map_err(|e| format!("Failed to decode base64: {}", e))?;
+
+    let file_name = format!("clipboard_{}.png", chrono::Local::now().format("%Y%m%d_%H%M%S"));
+    let file_path = state.cache_dir.join(&file_name);
+
+    std::fs::write(&file_path, bytes).map_err(|e| format!("Failed to write file: {}", e))?;
+
+    // Allow path
+    state.allowed_paths.write().await.insert(file_path.clone());
+
+    Ok(file_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn open_system_settings() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "ms-settings:notifications"])
+            .spawn()
+            .map_err(|e| format!("Failed to open system settings: {}", e))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(["x-apple.systempreferences:com.apple.preference.notifications"])
+            .spawn()
+            .map_err(|e| format!("Failed to open system settings: {}", e))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn save_clipboard_file(
+    state: State<'_, Arc<AppState>>,
+    base64_data: String,
+    filename: String,
+) -> Result<String, String> {
+    use base64::{engine::general_purpose, Engine as _};
+    
+    let bytes = general_purpose::STANDARD
+        .decode(&base64_data)
+        .map_err(|e| format!("Failed to decode base64: {}", e))?;
+
+    let safe_filename = filename.replace(&['/', '\\', ':', '*', '?', '"', '<', '>', '|'][..], "_");
+    let file_path = state.cache_dir.join(&safe_filename);
+
+    std::fs::write(&file_path, bytes).map_err(|e| format!("Failed to write file: {}", e))?;
+
+    state.allowed_paths.write().await.insert(file_path.clone());
+
+    Ok(file_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 async fn get_peers(state: State<'_, Arc<AppState>>) -> Result<Vec<serde_json::Value>, String> {
     let peers = state.online_peers.read().await;
     let list: Vec<serde_json::Value> = peers
@@ -650,6 +794,7 @@ async fn get_peers(state: State<'_, Arc<AppState>>) -> Result<Vec<serde_json::Va
                 "avatarBase64": info.payload.avatar_base64,
                 "os": info.payload.os,
                 "appState": info.payload.app_state,
+                "version": info.payload.version,
                 "ip": info.ip,
                 "isOnline": info.is_online,
                 "lastSeen": info.last_seen_time,
@@ -746,6 +891,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None::<Vec<&'static str>>,
@@ -979,7 +1126,11 @@ pub fn run() {
             save_as_file,
             save_settings,
             load_settings,
-            add_peer_manual
+            add_peer_manual,
+            save_clipboard_image,
+            save_clipboard_file,
+            set_masquerade_icon,
+            open_system_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

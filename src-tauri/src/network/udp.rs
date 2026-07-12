@@ -141,9 +141,8 @@ async fn listen_loop(
                             },
                         );
 
-                        let _ = state.save_peers(&*peers).await;
-
                         if changed {
+                            let _ = state.save_peers(&*peers).await;
                             emit_peers_update(&app_handle, &*peers);
 
                             // Cross-subnet discovery / Manual Add: ONLY reply if this is a newly discovered
@@ -194,6 +193,7 @@ pub async fn broadcast_heartbeat(state: &AppState) {
         avatar_base64: state.avatar_base64.read().await.clone(),
         os: std::env::consts::OS.to_string(),
         app_state: Some(if is_focused { "active".to_string() } else { "background".to_string() }),
+        version: Some(env!("CARGO_PKG_VERSION").to_string()),
     };
 
     if let Ok(envelope) = Envelope::new("heartbeat", &payload) {
@@ -238,6 +238,7 @@ async fn broadcast_loop(
             avatar_base64: state.avatar_base64.read().await.clone(),
             os: std::env::consts::OS.to_string(),
             app_state: Some(if is_focused { "active".to_string() } else { "background".to_string() }),
+            version: Some(env!("CARGO_PKG_VERSION").to_string()),
         };
 
         if let Ok(envelope) = Envelope::new("heartbeat", &payload) {
@@ -284,7 +285,7 @@ async fn cleanup_loop(app_handle: AppHandle, state: Arc<AppState>) {
             let timeout = if info.payload.app_state.as_deref() == Some("background") {
                 Duration::from_secs(300) // 5 minutes for background apps (OS may throttle timers)
             } else {
-                Duration::from_secs(60) // 60 seconds for active apps
+                Duration::from_secs(120) // 120 seconds for active apps to prevent inexplicable offline
             };
 
             if info.is_online && now.duration_since(info.last_seen) > timeout {
@@ -369,6 +370,7 @@ pub fn emit_peers_update(app_handle: &AppHandle, peers: &HashMap<uuid::Uuid, Pee
                 "avatarBase64": info.payload.avatar_base64,
                 "os": info.payload.os,
                 "appState": info.payload.app_state,
+                "version": info.payload.version,
                 "ip": info.ip,
                 "isOnline": info.is_online,
                 "lastSeen": info.last_seen_time,

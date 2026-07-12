@@ -40,7 +40,7 @@
                </div>
             </div>
             
-            <div style="display:flex; flex-direction: column;">
+            <div style="display:flex; flex-direction: column; min-width: 0;">
               <div class="msg-bubble" :class="{ 'file-bubble': msg.contentType === 'file' }">
                 
                 <div class="msg-quote" v-if="msg.quoteMsgId" style="border-left: 2px solid var(--accent-color); padding-left: 8px; margin-bottom: 8px; opacity: 0.8; font-size: 11px;">
@@ -154,8 +154,10 @@
               <textarea 
                 class="message-textarea"
                 v-model="messageInput" 
-                placeholder="输入消息，Enter 发送，Shift+Enter 换行..."
+                placeholder="输入消息，Enter 发送，Ctrl/Shift+Enter 换行..."
                 @keydown.enter.exact="handleEnter"
+                @keydown.ctrl.enter="handleNewLine"
+                @paste="handlePaste"
                 style="height: 100%;"
                 maxlength="2000"
               ></textarea>
@@ -301,7 +303,7 @@ const getAssetUrl = (path: string) => {
 
 const emit = defineEmits([
   'show-detail', 'clear-history', 'open-preview', 'download-file', 'open-file',
-  'select-share-file', 'send-message'
+  'select-share-file', 'send-message', 'paste-image'
 ]);
 
 const props = defineProps({
@@ -348,6 +350,60 @@ const stopResizeInput = () => {
   document.removeEventListener('mouseup', stopResizeInput);
 };
 
+const handlePaste = (e: ClipboardEvent) => {
+  if (e.clipboardData && e.clipboardData.items) {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (event.target && event.target.result) {
+              emit('paste-image', event.target.result as string);
+            }
+          };
+          reader.readAsDataURL(file);
+          return;
+        }
+      } else if (items[i].kind === 'file') {
+        const file = items[i].getAsFile();
+        if (file && file.size > 0 && file.size < 100 * 1024 * 1024) { // Max 100MB for temp save
+          e.preventDefault();
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+            if (event.target && event.target.result) {
+              const buffer = event.target.result as ArrayBuffer;
+              const bytes = new Uint8Array(buffer);
+              let binary = '';
+              const chunkSize = 8192;
+              for (let j = 0; j < bytes.length; j += chunkSize) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(j, j + chunkSize) as any);
+              }
+              const base64Data = btoa(binary);
+              
+              // Now we can emit this to a new event 'paste-file-buffer'
+              // but actually it's easier to just save it via invoke right here
+              try {
+                const { invoke } = await import('@tauri-apps/api/core');
+                const filePath = await invoke<string>("save_clipboard_file", { base64Data, filename: file.name });
+                if (filePath) {
+                  emit('select-share-file', filePath);
+                }
+              } catch(err) {
+                console.error("Failed to save clipboard file", err);
+              }
+            }
+          };
+          reader.readAsArrayBuffer(file);
+          return;
+        }
+      }
+    }
+  }
+};
+
 const contextMenuData = ref({ show: false, x: 0, y: 0, msg: null as any, selectedText: "" });
 
 function handleContextMenu(event: MouseEvent, msg: Message) {
@@ -391,6 +447,17 @@ function handleEnter(e: KeyboardEvent) {
       messageInput.value = '';
     }
   }, 10);
+}
+
+function handleNewLine(e: KeyboardEvent) {
+  const target = e.target as HTMLTextAreaElement;
+  if (!target) return;
+  const start = target.selectionStart;
+  const end = target.selectionEnd;
+  messageInput.value = messageInput.value.substring(0, start) + '\n' + messageInput.value.substring(end);
+  nextTick(() => {
+    target.selectionStart = target.selectionEnd = start + 1;
+  });
 }
 
 function sendMsg() {
@@ -479,6 +546,6 @@ function renderContent(content: string) {
   // Convert markdown to HTML
   const rawHtml = marked.parse(processed, { breaks: true });
   // Sanitize
-  return DOMPurify.sanitize(rawHtml as string);
+  return DOMPurify.sanitize(rawHtml as string).trim();
 }
 </script>

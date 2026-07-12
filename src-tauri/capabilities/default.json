@@ -31,6 +31,27 @@
         }
       ]
     },
-    "notification:default"
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "http://**"
+        },
+        {
+          "url": "https://**"
+        },
+        {
+          "url": "ms-settings:*"
+        },
+        {
+          "url": "ms-settings:**"
+        }
+      ]
+    },
+    "notification:default",
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "https://cdn.luogu.com.cn/**" }]
+    }
   ]
 }

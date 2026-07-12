@@ -53,7 +53,9 @@ export function useNetwork() {
           if (!peerProfiles.value[p.id] || 
               peerProfiles.value[p.id].username !== p.username || 
               peerProfiles.value[p.id].avatarId !== (p as any).avatarId ||
-              peerProfiles.value[p.id].avatarBase64 !== (p as any).avatarBase64) {
+              peerProfiles.value[p.id].avatarBase64 !== (p as any).avatarBase64 ||
+              peerProfiles.value[p.id].os !== (p as any).os ||
+              peerProfiles.value[p.id].version !== (p as any).version) {
             
             peerProfiles.value[p.id] = {
               username: peerProfiles.value[p.id]?.remark || p.username,
@@ -61,7 +63,8 @@ export function useNetwork() {
               avatarBase64: (p as any).avatarBase64 || undefined,
               remark: peerProfiles.value[p.id]?.remark,
               os: (p as any).os,
-              isPinned: peerProfiles.value[p.id]?.isPinned
+              isPinned: peerProfiles.value[p.id]?.isPinned,
+              version: (p as any).version
             };
           }
         }

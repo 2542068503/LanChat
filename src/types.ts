@@ -10,6 +10,7 @@ export interface Peer {
   avatarBase64?: string;
   os?: string;
   appState?: string;
+  version?: string;
 }
 
 export interface Profile {
@@ -19,6 +20,7 @@ export interface Profile {
   remark?: string;
   os?: string;
   isPinned?: boolean;
+  version?: string;
 }
 
 export interface FileInfo {

@@ -165,12 +165,12 @@ export function useFileTransfer() {
     });
   };
 
-  const selectAndShareFile = async () => {
+  const selectAndShareFile = async (providedFilePath?: string) => {
     if (!activePeerId.value) return;
     const targetPeerId = activePeerId.value;
 
     try {
-      const filePath = await invoke<string | null>("select_share_file");
+      const filePath = providedFilePath || await invoke<string | null>("select_share_file");
       if (!filePath) return;
 
       const fileName = filePath.split(/[/\\]/).pop() || "未知文件";
@@ -227,6 +227,64 @@ export function useFileTransfer() {
       throw e; 
     }
   };
+
+  const sendClipboardImage = async (base64Data: string) => {
+    if (!activePeerId.value) return;
+    const targetPeerId = activePeerId.value;
+
+    try {
+      const filePath = await invoke<string>("save_clipboard_image", { base64Data });
+      if (!filePath) return;
+
+      const fileName = filePath.split(/[/\\]/).pop() || "clipboard.png";
+
+      hashProgress.value = {
+        show: true,
+        filePath,
+        fileName,
+        bytesProcessed: 0,
+        totalBytes: 0,
+        speed: "计算中...",
+        startTime: Date.now(),
+        isHashing: true,
+        eta: "计算中..."
+      };
+
+      let sha256 = "";
+      try {
+        sha256 = await invoke("calculate_file_hash", { filePath });
+      } catch (e: any) {
+        if (e === "Cancelled") {
+          hashProgress.value.show = false;
+          return;
+        }
+        throw e;
+      }
+      
+      if (sha256 === "SKIPPED") {
+        sha256 = "";
+      }
+
+      const fileInfo: any = await invoke("share_file_with_hash", { filePath, sha256 });
+      hashProgress.value.show = false;
+      
+      const previewUrl = convertFileSrc(filePath);
+
+      fileSendConfirm.value = {
+        show: true,
+        filePath,
+        fileInfo,
+        targetPeerId,
+        imagePreviewUrl: previewUrl
+      };
+      
+    } catch (e: any) {
+      hashProgress.value.show = false;
+      console.error("Failed to share clipboard image:", e);
+      throw e;
+    }
+  };
+
   
   const sendConfirmedFile = async () => {
     const { targetPeerId, filePath, fileInfo } = fileSendConfirm.value;
@@ -398,6 +456,7 @@ export function useFileTransfer() {
     setupFileListeners,
     selectAndShareFile,
     sendConfirmedFile,
+    sendClipboardImage,
     autoDownloadImage,
     downloadFile,
     openFile,

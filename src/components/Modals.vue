@@ -58,6 +58,10 @@
                 {{ detailPeer.isOnline ? (detailPeer.appState === 'active' ? '在线 (活跃)' : (detailPeer.appState === 'background' ? '在线 (后台)' : '在线')) : '离线' }}
               </span>
             </div>
+            <div class="details-row">
+              <span class="details-label">LanChat 版本</span>
+              <span class="details-val font-mono">{{ detailPeer.version || '未知' }}</span>
+            </div>
             <div v-if="!detailPeer.isOnline" class="details-row">
               <span class="details-label">最后在线时间</span>
               <span class="details-val">{{ formatTime(detailPeer.lastSeen) }}</span>

@@ -111,6 +111,7 @@ async fn build_heartbeat_bytes(state: &AppState) -> Option<Vec<u8>> {
         avatar_base64: state.avatar_base64.read().await.clone(),
         os: std::env::consts::OS.to_string(),
         app_state: Some(if is_focused { "active".to_string() } else { "background".to_string() }),
+        version: Some(env!("CARGO_PKG_VERSION").to_string()),
     };
 
     if let Ok(envelope) = Envelope::new("heartbeat", &payload) {
