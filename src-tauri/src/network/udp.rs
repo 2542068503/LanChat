@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::net::UdpSocket;
 use tokio::time::sleep;
 
@@ -27,10 +27,11 @@ pub fn start_udp_discovery(app_handle: AppHandle, state: Arc<AppState>) {
         }
     });
 
+    let app_handle_clone2 = app_handle.clone();
     let state_clone2 = state.clone();
     // Task 2: Multicast Heartbeat Broadcast Loop
     tauri::async_runtime::spawn(async move {
-        if let Err(e) = broadcast_loop(state_clone2).await {
+        if let Err(e) = broadcast_loop(app_handle_clone2, state_clone2).await {
             eprintln!("UDP broadcast loop error: {}", e);
         }
     });
@@ -40,6 +41,17 @@ pub fn start_udp_discovery(app_handle: AppHandle, state: Arc<AppState>) {
     // Task 3: Peer Cleanup/Eviction Loop
     tauri::async_runtime::spawn(async move {
         cleanup_loop(app_handle_clone3, state_clone3).await;
+    });
+
+    let state_clone4 = state.clone();
+    // Task 4: Initial Unicast Probe for known peers across subnets
+    tauri::async_runtime::spawn(async move {
+        let peers = state_clone4.online_peers.read().await;
+        for peer in peers.values() {
+            if let Ok(ip) = peer.ip.parse::<Ipv4Addr>() {
+                scanner::send_unicast_heartbeat(&state_clone4, ip).await;
+            }
+        }
     });
 }
 
@@ -215,21 +227,41 @@ pub async fn broadcast_heartbeat(state: &AppState) {
                     }
                 }
             }
-            // Fallback
+            // Fallback and Unicast to known peers
             if let Ok(socket) = UdpSocket::bind("0.0.0.0:0").await {
                 let _ = socket.set_broadcast(true);
                 let _ = socket.send_to(&bytes, &dest_addr).await;
                 let _ = socket.send_to(&bytes, &bcast_addr).await;
+                
+                // Explicitly send unicast to all currently online peers for cross-subnet stability
+                let peers = state.online_peers.read().await;
+                for peer in peers.values() {
+                    if peer.is_online {
+                        if let Ok(ip) = peer.ip.parse::<Ipv4Addr>() {
+                            let peer_addr = SocketAddr::from((ip, MULTICAST_PORT));
+                            let _ = socket.send_to(&bytes, &peer_addr).await;
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 async fn broadcast_loop(
+    app_handle: AppHandle,
     state: Arc<AppState>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     loop {
-        let is_focused = *state.is_focused.read().await;
+        // Only report background if the window is truly minimized or hidden, not just when losing focus
+        let is_active = if let Some(window) = app_handle.get_webview_window("main") {
+            let visible = window.is_visible().unwrap_or(true);
+            let minimized = window.is_minimized().unwrap_or(false);
+            visible && !minimized
+        } else {
+            *state.is_focused.read().await // Fallback to focus state if window handle fails
+        };
+        
         let payload = HeartbeatPayload {
             id: state.peer_id,
             username: state.username.read().await.clone(),
@@ -237,7 +269,7 @@ async fn broadcast_loop(
             avatar_id: *state.avatar_id.read().await,
             avatar_base64: state.avatar_base64.read().await.clone(),
             os: std::env::consts::OS.to_string(),
-            app_state: Some(if is_focused { "active".to_string() } else { "background".to_string() }),
+            app_state: Some(if is_active { "active".to_string() } else { "background".to_string() }),
             version: Some(env!("CARGO_PKG_VERSION").to_string()),
         };
 
@@ -260,11 +292,22 @@ async fn broadcast_loop(
                         }
                     }
                 }
-                // Fallback
+                // Fallback and Unicast to known peers
                 if let Ok(socket) = UdpSocket::bind("0.0.0.0:0").await {
                     let _ = socket.set_broadcast(true);
                     let _ = socket.send_to(&bytes, &dest_addr).await;
                     let _ = socket.send_to(&bytes, &bcast_addr).await;
+                    
+                    // Explicitly send unicast to all currently online peers for cross-subnet stability
+                    let peers = state.online_peers.read().await;
+                    for peer in peers.values() {
+                        if peer.is_online {
+                            if let Ok(ip) = peer.ip.parse::<Ipv4Addr>() {
+                                let peer_addr = SocketAddr::from((ip, MULTICAST_PORT));
+                                let _ = socket.send_to(&bytes, &peer_addr).await;
+                            }
+                        }
+                    }
                 }
             }
         }

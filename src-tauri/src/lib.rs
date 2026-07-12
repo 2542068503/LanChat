@@ -2,6 +2,7 @@ pub mod crypto;
 pub mod network;
 pub mod protocol;
 pub mod state;
+mod aumid;
 
 use chrono::Utc;
 use std::path::PathBuf;
@@ -565,6 +566,25 @@ async fn set_masquerade_icon(
         
         if let Some(window) = app_handle.get_webview_window("main") {
             let _ = window.set_icon(icon);
+            #[cfg(target_os = "windows")]
+            {
+                unsafe {
+                    let aumid = windows::core::HSTRING::from("com.zhangshiyan.lanchat.mask");
+                    let _ = windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
+                        windows::core::PCWSTR::from_raw(aumid.as_ptr())
+                    );
+                    if let Ok(hwnd) = window.hwnd() {
+                        let hwnd_isize = std::mem::transmute::<_, isize>(hwnd);
+                        aumid::set_window_aumid(hwnd_isize, "com.zhangshiyan.lanchat.mask");
+                    }
+                }
+                let _ = window.set_skip_taskbar(true);
+                let w = window.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                    let _ = w.set_skip_taskbar(false);
+                });
+            }
         }
     } else {
         *masquerade = None;
@@ -579,6 +599,25 @@ async fn set_masquerade_icon(
         if let Some(window) = app_handle.get_webview_window("main") {
             if let Some(icon) = default_icon.clone() {
                 let _ = window.set_icon(icon);
+            }
+            #[cfg(target_os = "windows")]
+            {
+                unsafe {
+                    let aumid = windows::core::HSTRING::from("com.zhangshiyan.lanchat");
+                    let _ = windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
+                        windows::core::PCWSTR::from_raw(aumid.as_ptr())
+                    );
+                    if let Ok(hwnd) = window.hwnd() {
+                        let hwnd_isize = std::mem::transmute::<_, isize>(hwnd);
+                        aumid::set_window_aumid(hwnd_isize, "com.zhangshiyan.lanchat");
+                    }
+                }
+                let _ = window.set_skip_taskbar(true);
+                let w = window.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                    let _ = w.set_skip_taskbar(false);
+                });
             }
         }
     }
@@ -1059,9 +1098,13 @@ pub fn run() {
                     }
                     Err(_) => {
                         // 已有实例在运行：向其发送唤醒信号，随后强制退出
-                        if let Ok(mut stream) = std::net::TcpStream::connect("127.0.0.1:37284") {
-                            use std::io::Write;
-                            let _ = stream.write_all(b"WAKE");
+                        // 如果当前是作为自启动项被唤起（如被 Windows 重复拉起），则不发送唤醒信号，保持原实例静默
+                        let is_autostart = std::env::args().any(|arg| arg == "--autostart");
+                        if !is_autostart {
+                            if let Ok(mut stream) = std::net::TcpStream::connect("127.0.0.1:37284") {
+                                use std::io::Write;
+                                let _ = stream.write_all(b"WAKE");
+                            }
                         }
                         std::process::exit(0);
                     }

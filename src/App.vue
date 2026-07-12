@@ -103,6 +103,7 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 
 // Stores and Composables
 import { currentTab, selfInfo, activePeerId, chats, globalToast, showToast, globalAppIconUrl, unreadCounts } from './store';
@@ -174,7 +175,7 @@ const stopResizeSidebar = () => {
 const { fetchSelfInfo, setupNetworkListeners, loadProfilesFromLocalStorage } = useNetwork();
 const { setupChatListeners, sendMessage, loadChatsFromLocalStorage } = useChat();
 const { setupFileListeners, selectAndShareFile, sendConfirmedFile, sendClipboardImage, downloadFile, openFile, openImagePreview, autoDownloadImage } = useFileTransfer();
-const { initSettings, isDarkTheme, enableCtrlWClose, silentStartup } = useSettings();
+const { initSettings, isDarkTheme, enableCtrlWClose } = useSettings();
 
 watch(isMinimalMode, async (val) => {
   await appWindow.setSkipTaskbar(val);
@@ -312,12 +313,25 @@ onMounted(async () => {
   await fetchSelfInfo();
   initSettings();
 
-  if (!silentStartup.value) {
-    // Slight delay to prevent flickering during initial setup
-    setTimeout(async () => {
-      await appWindow.show();
-      await appWindow.setFocus();
-    }, 50);
+  try {
+    const isAutostart = await invoke<boolean>('is_autostart');
+    const isSilent = localStorage.getItem("silentStartup") === "true";
+    
+    // Only hide if it's an OS autostart AND silent startup is enabled
+    if (!(isAutostart && isSilent)) {
+      setTimeout(async () => {
+        await appWindow.show();
+        await appWindow.setFocus();
+      }, 50);
+    }
+  } catch (e) {
+    // Fallback if invoke fails
+    if (localStorage.getItem("silentStartup") !== "true") {
+      setTimeout(async () => {
+        await appWindow.show();
+        await appWindow.setFocus();
+      }, 50);
+    }
   }
 
   await setupNetworkListeners();

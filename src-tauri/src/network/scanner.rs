@@ -54,16 +54,24 @@ async fn run_scan(
     let udp = Arc::new(UdpSocket::from_std(std_socket)?);
 
     let mut tasks = Vec::new();
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(16)); // Limit concurrent subnet scans to 16
 
     for ip in local_ips {
         let octets = ip.octets();
 
         // Fast scan the entire /16 (65535 IPs) using concurrent tasks per /24
-        for third in 0..=255u8 {
+        // Reorder to scan the local subnet first for faster immediate discovery
+        let mut thirds: Vec<u8> = (0..=255u8).collect();
+        thirds.retain(|&x| x != octets[2]);
+        thirds.insert(0, octets[2]);
+
+        for third in thirds {
             let udp_clone = udp.clone();
             let bytes_clone = heartbeat_bytes.clone();
+            let permit = semaphore.clone().acquire_owned().await.unwrap();
 
             tasks.push(tokio::spawn(async move {
+                let _permit = permit; // Drop permit when task completes
                 // Send directed broadcast to this /24 subnet first
                 let bcast_ip = Ipv4Addr::new(octets[0], octets[1], third, 255);
                 let bcast_dest = SocketAddr::from((bcast_ip, DISCOVERY_PORT));
@@ -73,14 +81,19 @@ async fn run_scan(
                     let target_ip = Ipv4Addr::new(octets[0], octets[1], third, host);
                     let dest = SocketAddr::from((target_ip, DISCOVERY_PORT));
 
+                    // Yield occasionally to prevent flooding OS UDP buffers
+                    if host % 16 == 0 {
+                        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+                    }
+
                     let mut retries = 0;
                     while let Err(e) = udp_clone.send_to(&bytes_clone, &dest).await {
                         // Yield if OS buffer is full or would block
                         if e.raw_os_error() == Some(10055) || e.raw_os_error() == Some(10035) {
-                            if retries >= 5 {
+                            if retries >= 3 {
                                 break; // Max retries exceeded
                             }
-                            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+                            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
                             retries += 1;
                         } else {
                             // For other errors like NetworkUnreachable, we break out of the while loop and continue to the next IP
