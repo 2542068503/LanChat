@@ -569,13 +569,16 @@ async fn set_masquerade_icon(
             #[cfg(target_os = "windows")]
             {
                 unsafe {
-                    let aumid = windows::core::HSTRING::from("com.zhangshiyan.lanchat.mask");
+                    // 随机化 AUMID 防止 Windows 任务栏缓存前一次的伪装图标
+                    let random_suffix = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis();
+                    let mask_aumid = format!("com.zhangshiyan.lanchat.mask.{}", random_suffix);
+                    let aumid = windows::core::HSTRING::from(mask_aumid.clone());
                     let _ = windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
                         windows::core::PCWSTR::from_raw(aumid.as_ptr())
                     );
                     if let Ok(hwnd) = window.hwnd() {
                         let hwnd_isize = std::mem::transmute::<_, isize>(hwnd);
-                        aumid::set_window_aumid(hwnd_isize, "com.zhangshiyan.lanchat.mask");
+                        aumid::set_window_aumid(hwnd_isize, &mask_aumid);
                     }
                 }
                 let _ = window.set_skip_taskbar(true);
