@@ -956,6 +956,14 @@ pub fn run() {
         .setup(move |app| {
             let app_handle = app.handle().clone();
 
+            #[cfg(windows)]
+            {
+                use windows::Win32::System::Power::{SetThreadExecutionState, ES_CONTINUOUS, ES_SYSTEM_REQUIRED};
+                unsafe {
+                    let _ = SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+                }
+            }
+
             // Resolve AppData configuration directory and ensure it exists
             let config_dir = app_handle
                 .path()

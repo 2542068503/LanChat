@@ -327,7 +327,7 @@ async fn cleanup_loop(app_handle: AppHandle, state: Arc<AppState>) {
 
         for (id, info) in peers.iter_mut() {
             let timeout = if info.payload.app_state.as_deref() == Some("background") {
-                Duration::from_secs(90) // 90 seconds for background apps
+                Duration::from_secs(3600) // 1 hour for background apps (OS suspends them)
             } else {
                 Duration::from_secs(45) // 45 seconds for active apps
             };

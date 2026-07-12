@@ -157,7 +157,6 @@
                 placeholder="输入消息，Enter 发送，Ctrl/Shift+Enter 换行..."
                 @keydown.enter.exact="handleEnter"
                 @keydown.ctrl.enter="handleNewLine"
-                @paste="handlePaste"
                 style="height: 100%;"
                 maxlength="2000"
               ></textarea>
@@ -188,7 +187,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted } from 'vue';
+import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import katex from 'katex';
@@ -274,6 +273,11 @@ watch(activeMessages, () => {
 
 onMounted(() => {
   scrollToBottom();
+  window.addEventListener('paste', handlePaste);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('paste', handlePaste);
 });
 
 const expandedLatex = ref<Record<string, boolean>>({});
@@ -501,9 +505,11 @@ function getInitials(name: string) {
   if (/[\u4e00-\u9fa5]/.test(trimmed)) {
     return trimmed.slice(-2);
   }
-  const parts = trimmed.split(/[\s_-]+/);
+  const parts = trimmed.split(/[\s-]+/).filter(p => p.length > 0);
   if (parts.length > 1) {
     return (parts[0][0] + parts[1][0]).toUpperCase();
+  } else if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
   }
   return trimmed.slice(0, 2).toUpperCase();
 }

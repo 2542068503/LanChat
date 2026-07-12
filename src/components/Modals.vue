@@ -288,9 +288,11 @@ function getInitials(name: string) {
   if (/[\u4e00-\u9fa5]/.test(trimmed)) {
     return trimmed.slice(-2);
   }
-  const parts = trimmed.split(/[\s_-]+/);
+  const parts = trimmed.split(/[\s-]+/).filter(p => p.length > 0);
   if (parts.length > 1) {
     return (parts[0][0] + parts[1][0]).toUpperCase();
+  } else if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
   }
   return trimmed.slice(0, 2).toUpperCase();
 }

@@ -65,8 +65,11 @@ export function useChat() {
           if (enableSystemNotification.value) {
             const profile = getSenderProfile(msg.senderId, msg);
             let bodyText = msg.contentType === 'text' ? msg.content : `[${msg.contentType}]`;
-            if (msg.contentType === 'file') bodyText = '[文件]';
-            else if (msg.contentType === 'image') bodyText = '[图片]';
+            
+            const isImg = msg.contentType === 'image' || (msg.contentType === 'file' && msg.fileInfo?.name && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(msg.fileInfo.name.split('.').pop()?.toLowerCase() || ''));
+            
+            if (isImg) bodyText = '[图片]';
+            else if (msg.contentType === 'file') bodyText = '[文件]';
             
             try {
               sendNotification({
@@ -92,8 +95,11 @@ export function useChat() {
           if (enableSystemNotification.value) {
             const profile = getSenderProfile(msg.senderId, msg);
             let bodyText = msg.contentType === 'text' ? msg.content : `[${msg.contentType}]`;
-            if (msg.contentType === 'file') bodyText = '[文件]';
-            else if (msg.contentType === 'image') bodyText = '[图片]';
+            
+            const isImg = msg.contentType === 'image' || (msg.contentType === 'file' && msg.fileInfo?.name && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(msg.fileInfo.name.split('.').pop()?.toLowerCase() || ''));
+            
+            if (isImg) bodyText = '[图片]';
+            else if (msg.contentType === 'file') bodyText = '[文件]';
             
             try {
               sendNotification({
