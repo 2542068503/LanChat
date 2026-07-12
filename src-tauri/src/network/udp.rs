@@ -139,6 +139,7 @@ async fn listen_loop(
                             peers.remove(&id);
                             changed = true;
                         }
+                        let is_really_online = payload.app_state.as_deref() != Some("offline");
 
                         peers.insert(
                             payload.id,
@@ -147,7 +148,7 @@ async fn listen_loop(
                                 ip: src_addr.ip().to_string(),
                                 last_seen: Instant::now(),
                                 last_seen_time: chrono::Utc::now().timestamp_millis(),
-                                is_online: true,
+                                is_online: is_really_online,
                                 remark: existing_remark,
                                 is_pinned: existing_pinned,
                             },
@@ -326,9 +327,9 @@ async fn cleanup_loop(app_handle: AppHandle, state: Arc<AppState>) {
 
         for (id, info) in peers.iter_mut() {
             let timeout = if info.payload.app_state.as_deref() == Some("background") {
-                Duration::from_secs(300) // 5 minutes for background apps (OS may throttle timers)
+                Duration::from_secs(90) // 90 seconds for background apps
             } else {
-                Duration::from_secs(120) // 120 seconds for active apps to prevent inexplicable offline
+                Duration::from_secs(45) // 45 seconds for active apps
             };
 
             if info.is_online && now.duration_since(info.last_seen) > timeout {

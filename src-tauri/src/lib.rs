@@ -1178,6 +1178,60 @@ pub fn run() {
             set_masquerade_icon,
             open_system_settings
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| match event {
+            tauri::RunEvent::Exit => {
+                use tauri::Manager;
+                use std::sync::Arc;
+                let state = app_handle.state::<Arc<crate::state::AppState>>();
+                
+                let username = state.username.try_read().map(|u| u.clone()).unwrap_or_default();
+                let tcp_port = state.tcp_port.try_read().map(|p| *p).unwrap_or(0);
+                let avatar_id = state.avatar_id.try_read().map(|a| *a).unwrap_or(0);
+                let avatar_base64 = state.avatar_base64.try_read().map(|a| a.clone()).unwrap_or_default();
+                
+                let payload = crate::protocol::HeartbeatPayload {
+                    id: state.peer_id,
+                    username,
+                    tcp_port,
+                    avatar_id,
+                    avatar_base64,
+                    os: std::env::consts::OS.to_string(),
+                    app_state: Some("offline".to_string()),
+                    version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                };
+
+                if let Ok(envelope) = crate::protocol::Envelope::new("heartbeat", &payload) {
+                    if let Ok(bytes) = envelope.to_encrypted_bytes() {
+                        let dest_addr = std::net::SocketAddr::from(([239, 255, 0, 1], 9000));
+                        let bcast_addr = std::net::SocketAddr::from(([255, 255, 255, 255], 9000));
+
+                        if let Ok(interfaces) = local_ip_address::list_afinet_netifas() {
+                            for (_name, ip) in interfaces {
+                                if let std::net::IpAddr::V4(ipv4) = ip {
+                                    if !ipv4.is_loopback() {
+                                        if let Ok(socket) = std::net::UdpSocket::bind(format!("{}:0", ipv4)) {
+                                            let _ = socket.set_broadcast(true);
+                                            let _ = socket.send_to(&bytes, dest_addr);
+                                            let _ = socket.send_to(&bytes, bcast_addr);
+                                            
+                                            // 向所有在线节点发单播离线通知
+                                            if let Ok(peers) = state.online_peers.try_read() {
+                                                for peer in peers.values() {
+                                                    if let Ok(addr) = format!("{}:9000", peer.ip).parse::<std::net::SocketAddr>() {
+                                                        let _ = socket.send_to(&bytes, addr);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        });
 }
