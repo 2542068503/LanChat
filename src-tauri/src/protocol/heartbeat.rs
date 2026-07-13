@@ -8,8 +8,11 @@ pub struct HeartbeatPayload {
     pub username: String,
     pub tcp_port: u16,
     pub avatar_id: u8,
+    #[serde(default)]
     pub avatar_base64: Option<String>,
     pub os: String,
+    #[serde(default)]
     pub app_state: Option<String>,
+    #[serde(default)]
     pub version: Option<String>,
 }

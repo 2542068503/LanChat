@@ -9,12 +9,17 @@ pub struct ChatMessagePayload {
     pub content_type: String, // "text" | "file"
     pub content: String,
     pub timestamp: i64,
+    #[serde(default)]
     pub file_info: Option<FileInfo>,
+    #[serde(default)]
     pub render_latex: Option<bool>,
 
     // Quote (Reply) support
+    #[serde(default)]
     pub quote_msg_id: Option<Uuid>,
+    #[serde(default)]
     pub quote_sender: Option<String>,
+    #[serde(default)]
     pub quote_content: Option<String>,
 }
 

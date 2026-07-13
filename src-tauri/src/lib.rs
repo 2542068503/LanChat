@@ -565,27 +565,30 @@ async fn set_masquerade_icon(
         }
         
         if let Some(window) = app_handle.get_webview_window("main") {
-            let _ = window.set_icon(icon);
+            let _ = window.set_icon(icon.clone());
             #[cfg(target_os = "windows")]
             {
-                unsafe {
-                    // 随机化 AUMID 防止 Windows 任务栏缓存前一次的伪装图标
-                    let random_suffix = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis();
-                    let mask_aumid = format!("com.zhangshiyan.lanchat.mask.{}", random_suffix);
-                    let aumid = windows::core::HSTRING::from(mask_aumid.clone());
-                    let _ = windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
-                        windows::core::PCWSTR::from_raw(aumid.as_ptr())
-                    );
-                    if let Ok(hwnd) = window.hwnd() {
-                        let hwnd_isize = std::mem::transmute::<_, isize>(hwnd);
-                        aumid::set_window_aumid(hwnd_isize, &mask_aumid);
-                    }
-                }
-                let _ = window.set_skip_taskbar(true);
                 let w = window.clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-                    let _ = w.set_skip_taskbar(false);
+                let _ = app_handle.run_on_main_thread(move || {
+                    unsafe {
+                        // 随机化 AUMID 防止 Windows 任务栏缓存前一次的伪装图标
+                        let random_suffix = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis();
+                        let mask_aumid = format!("com.zhangshiyan.lanchat.mask.{}", random_suffix);
+                        let aumid = windows::core::HSTRING::from(mask_aumid.clone());
+                        let _ = windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
+                            windows::core::PCWSTR::from_raw(aumid.as_ptr())
+                        );
+                        if let Ok(hwnd) = w.hwnd() {
+                            let hwnd_isize = std::mem::transmute::<_, isize>(hwnd);
+                            aumid::set_window_aumid(hwnd_isize, &mask_aumid);
+                        }
+                    }
+                    let _ = w.set_skip_taskbar(true);
+                    let w2 = w.clone();
+                    tauri::async_runtime::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                        let _ = w2.set_skip_taskbar(false);
+                    });
                 });
             }
         }
@@ -605,21 +608,24 @@ async fn set_masquerade_icon(
             }
             #[cfg(target_os = "windows")]
             {
-                unsafe {
-                    let aumid = windows::core::HSTRING::from("com.zhangshiyan.lanchat");
-                    let _ = windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
-                        windows::core::PCWSTR::from_raw(aumid.as_ptr())
-                    );
-                    if let Ok(hwnd) = window.hwnd() {
-                        let hwnd_isize = std::mem::transmute::<_, isize>(hwnd);
-                        aumid::set_window_aumid(hwnd_isize, "com.zhangshiyan.lanchat");
-                    }
-                }
-                let _ = window.set_skip_taskbar(true);
                 let w = window.clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-                    let _ = w.set_skip_taskbar(false);
+                let _ = app_handle.run_on_main_thread(move || {
+                    unsafe {
+                        let aumid = windows::core::HSTRING::from("com.zhangshiyan.lanchat");
+                        let _ = windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
+                            windows::core::PCWSTR::from_raw(aumid.as_ptr())
+                        );
+                        if let Ok(hwnd) = w.hwnd() {
+                            let hwnd_isize = std::mem::transmute::<_, isize>(hwnd);
+                            aumid::set_window_aumid(hwnd_isize, "com.zhangshiyan.lanchat");
+                        }
+                    }
+                    let _ = w.set_skip_taskbar(true);
+                    let w2 = w.clone();
+                    tauri::async_runtime::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                        let _ = w2.set_skip_taskbar(false);
+                    });
                 });
             }
         }
