@@ -315,6 +315,15 @@ const props = defineProps({
 });
 
 const messageInput = ref("");
+const lastSendTime = ref(0);
+
+watch(messageInput, (newVal) => {
+  const lines = newVal.split('\n');
+  if (lines.length > 50) {
+    messageInput.value = lines.slice(0, 50).join('\n');
+    showToast("输入不能超过 50 行", "error");
+  }
+});
 
 const inputHeight = ref(150);
 let isResizingInput = false;
@@ -468,14 +477,33 @@ function sendMsg() {
   const content = messageInput.value.trim();
   if (!content) return;
   
-  if (content.length > 2000) {
-    showToast("发送的文本不能超过 2000 个字符", "error");
+  const now = Date.now();
+  if (now - lastSendTime.value < 500) {
+    showToast("发送太频繁，请稍后再试", "error");
     return;
   }
-  
-  const linesCount = content.split('\n').length;
-  if (linesCount > 50) {
-    showToast("发送的消息不能超过 50 行", "error");
+  lastSendTime.value = now;
+
+  if (content.length > 2000) {
+    if (window.confirm("文本过长(超过2000字符)，是否将其转换为文件发送？")) {
+      const isLatex = useLatexForCurrentMessage.value;
+      const filename = isLatex ? "message.md" : "message.txt";
+      
+      const base64Data = btoa(unescape(encodeURIComponent(content)));
+      
+      import('@tauri-apps/api/core').then(({ invoke }) => {
+        invoke<string>("save_clipboard_file", { base64Data, filename }).then(filePath => {
+          if (filePath) {
+            emit('select-share-file', filePath);
+            messageInput.value = "";
+            useLatexForCurrentMessage.value = defaultRenderLatex.value;
+          }
+        }).catch(err => {
+          console.error("Failed to save long text as file", err);
+          showToast("保存文件失败", "error");
+        });
+      });
+    }
     return;
   }
   
