@@ -1,6 +1,6 @@
 [package]
 name = "LanChat"
-version = "1.3.4"
+version = "1.4.0"
 description = "A P2P LAN Chat application"
 authors = ["zhangshiyan"]
 edition = "2021"
