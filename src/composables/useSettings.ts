@@ -13,6 +13,7 @@ const globalFontSize = ref(14);
 const isDarkTheme = ref(false);
 const defaultRenderLatex = ref(false);
 const enableCtrlWClose = ref(true);
+const enableCtrlTabSwitch = ref(true);
 const appAccentColor = ref("#10b981");
 const autostartEnabled = ref(false);
 const silentStartup = ref(false);
@@ -35,6 +36,7 @@ export function useSettings() {
         if (settings.globalFontSize) localStorage.setItem("globalFontSize", settings.globalFontSize);
         if (settings.defaultRenderLatex) localStorage.setItem("defaultRenderLatex", settings.defaultRenderLatex);
         if (settings.enableCtrlWClose) localStorage.setItem("enableCtrlWClose", settings.enableCtrlWClose);
+        if (settings.enableCtrlTabSwitch) localStorage.setItem("enableCtrlTabSwitch", settings.enableCtrlTabSwitch);
         if (settings.silentStartup) localStorage.setItem("silentStartup", settings.silentStartup);
         if (settings.appTheme) localStorage.setItem("appTheme", settings.appTheme);
         if (settings.enableSystemNotification) localStorage.setItem("enableSystemNotification", settings.enableSystemNotification);
@@ -66,6 +68,11 @@ export function useSettings() {
     const savedCtrlW = localStorage.getItem("enableCtrlWClose");
     if (savedCtrlW) {
       enableCtrlWClose.value = savedCtrlW === "true";
+    }
+
+    const savedCtrlTab = localStorage.getItem("enableCtrlTabSwitch");
+    if (savedCtrlTab) {
+      enableCtrlTabSwitch.value = savedCtrlTab === "true";
     }
     
     const savedSilent = localStorage.getItem("silentStartup");
@@ -143,6 +150,7 @@ export function useSettings() {
       globalFontSize: localStorage.getItem("globalFontSize"),
       defaultRenderLatex: localStorage.getItem("defaultRenderLatex"),
       enableCtrlWClose: localStorage.getItem("enableCtrlWClose"),
+      enableCtrlTabSwitch: localStorage.getItem("enableCtrlTabSwitch"),
       silentStartup: localStorage.getItem("silentStartup"),
       appTheme: localStorage.getItem("appTheme"),
       enableSystemNotification: localStorage.getItem("enableSystemNotification"),
@@ -237,6 +245,11 @@ export function useSettings() {
     syncSettings();
   };
 
+  const saveCtrlTabSwitch = () => {
+    localStorage.setItem("enableCtrlTabSwitch", enableCtrlTabSwitch.value.toString());
+    syncSettings();
+  };
+
   const toggleTheme = () => {
     isDarkTheme.value = !isDarkTheme.value;
     localStorage.setItem("appTheme", isDarkTheme.value ? "dark" : "light");
@@ -287,6 +300,7 @@ export function useSettings() {
     isDarkTheme,
     defaultRenderLatex,
     enableCtrlWClose,
+    enableCtrlTabSwitch,
     appAccentColor,
     autostartEnabled,
     silentStartup,
@@ -300,6 +314,7 @@ export function useSettings() {
     saveGlobalFontSize,
     saveDefaultRenderLatex,
     saveCtrlWClose,
+    saveCtrlTabSwitch,
     toggleTheme,
     toggleSilentStartup,
     toggleSystemNotification,

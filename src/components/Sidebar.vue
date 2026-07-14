@@ -293,14 +293,36 @@ function getInitials(name: string) {
   return trimmed.slice(0, 2).toUpperCase();
 }
 
-function formatOS(os: string | undefined | null) {
+const formatOS = (os?: string) => {
   if (!os) return '';
   const lower = os.toLowerCase();
   if (lower.includes('win')) return 'win';
   if (lower.includes('mac')) return 'mac';
   if (lower.includes('linux')) return 'linux';
   return os;
-}
+};
+
+defineExpose({
+  switchPeerTab(direction: 1 | -1) {
+    const visiblePeers = [];
+    for (const group of peerGroups.value) {
+      if (group.peers.length > 0) {
+        visiblePeers.push(...group.peers);
+      }
+    }
+    
+    if (visiblePeers.length <= 1) return;
+
+    const currentIndex = visiblePeers.findIndex(p => p.id === activePeerId.value);
+    let nextIndex = 0;
+    
+    if (currentIndex !== -1) {
+      nextIndex = (currentIndex + direction + visiblePeers.length) % visiblePeers.length;
+    }
+    
+    emit('select-peer', visiblePeers[nextIndex].id);
+  }
+});
 </script>
 
 <style scoped>

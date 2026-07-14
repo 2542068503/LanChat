@@ -48,6 +48,7 @@
       <div class="main-body-container">
         <div class="chats-view-layout" v-show="currentTab === 'chat'">
           <Sidebar 
+            ref="sidebarRef"
             v-show="!isSidebarCollapsed"
             @select-peer="selectPeer" 
             @show-detail="showPeerDetail"
@@ -175,7 +176,14 @@ const stopResizeSidebar = () => {
 const { fetchSelfInfo, setupNetworkListeners, loadProfilesFromLocalStorage } = useNetwork();
 const { setupChatListeners, sendMessage, loadChatsFromLocalStorage } = useChat();
 const { setupFileListeners, selectAndShareFile, sendConfirmedFile, sendClipboardImage, downloadFile, openFile, openImagePreview, autoDownloadImage } = useFileTransfer();
-const { initSettings, isDarkTheme, enableCtrlWClose } = useSettings();
+const { 
+  initSettings,
+  isDarkTheme,
+  enableCtrlWClose,
+  enableCtrlTabSwitch
+} = useSettings();
+
+const sidebarRef = ref<any>(null);
 
 watch(isMinimalMode, async (val) => {
   await appWindow.setSkipTaskbar(val);
@@ -373,6 +381,15 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   if (e.ctrlKey && e.key.toLowerCase() === 'w' && enableCtrlWClose.value) {
     e.preventDefault();
     closeWindow();
+    return;
+  }
+  
+  if (e.ctrlKey && e.key.toLowerCase() === 'tab' && enableCtrlTabSwitch.value) {
+    e.preventDefault();
+    if (sidebarRef.value) {
+      sidebarRef.value.switchPeerTab(e.shiftKey ? -1 : 1);
+    }
+    return;
   }
 }
 
