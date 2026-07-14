@@ -477,25 +477,23 @@ function sendMsg() {
   lastSendTime.value = now;
 
   if (content.length > 2000 || content.split('\n').length > 100) {
-    if (window.confirm("文本过长(超过2000字符或100行)，是否将其转换为文件发送？")) {
-      const isLatex = useLatexForCurrentMessage.value;
-      const filename = isLatex ? "message.md" : "message.txt";
-      
-      const base64Data = btoa(unescape(encodeURIComponent(content)));
-      
-      import('@tauri-apps/api/core').then(({ invoke }) => {
-        invoke<string>("save_clipboard_file", { base64Data, filename }).then(filePath => {
-          if (filePath) {
-            emit('select-share-file', filePath);
-            messageInput.value = "";
-            useLatexForCurrentMessage.value = defaultRenderLatex.value;
-          }
-        }).catch(err => {
-          console.error("Failed to save long text as file", err);
-          showToast("保存文件失败", "error");
-        });
+    const isLatex = useLatexForCurrentMessage.value || /\$\$(.*?)\$\$/s.test(content) || /\$(.*?)\$/.test(content);
+    const filename = isLatex ? "message.md" : "message.txt";
+    
+    const base64Data = btoa(unescape(encodeURIComponent(content)));
+    
+    import('@tauri-apps/api/core').then(({ invoke }) => {
+      invoke<string>("save_clipboard_file", { base64Data, filename }).then(filePath => {
+        if (filePath) {
+          emit('select-share-file', filePath);
+          messageInput.value = "";
+          useLatexForCurrentMessage.value = defaultRenderLatex.value;
+        }
+      }).catch(err => {
+        console.error("Failed to save long text as file", err);
+        showToast("保存文件失败", "error");
       });
-    }
+    });
     return;
   }
   
