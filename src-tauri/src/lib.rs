@@ -921,13 +921,36 @@ async fn add_peer_manual(state: State<'_, Arc<AppState>>, ip: String) -> Result<
     if let Ok(target) = ip.parse::<std::net::Ipv4Addr>() {
         crate::network::scanner::send_unicast_heartbeat(state.inner(), target).await;
         Ok(())
-    } else {
+} else {
         Err("无效的 IP 地址格式".to_string())
     }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // === IP Restriction Logic Start ===
+    if let Ok(interfaces) = local_ip_address::list_afinet_netifas() {
+        let mut has_6_101_90 = false;
+        let mut is_allowed = false;
+
+        for (_name, ip) in interfaces {
+            if let std::net::IpAddr::V4(ipv4) = ip {
+                let ip_str = ipv4.to_string();
+                if ip_str.starts_with("6.101.90.") {
+                    has_6_101_90 = true;
+                    if ip_str == "6.101.90.110" || ip_str == "6.101.90.116" || ip_str == "6.101.90.136" {
+                        is_allowed = true;
+                    }
+                }
+            }
+        }
+
+        if has_6_101_90 && !is_allowed {
+            std::process::exit(0);
+        }
+    }
+    // === IP Restriction Logic End ===
+
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
