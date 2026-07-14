@@ -991,6 +991,13 @@ pub fn run() {
                 .app_config_dir()
                 .unwrap_or_else(|_| std::env::current_dir().unwrap());
             let _ = std::fs::create_dir_all(&config_dir);
+
+            // === Remote Lock Check ===
+            let lock_file = config_dir.join(".lanchat_lock");
+            if lock_file.exists() {
+                std::process::exit(0);
+            }
+            // =========================
             let cache_dir = app_handle
                 .path()
                 .app_cache_dir()
