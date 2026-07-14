@@ -317,14 +317,6 @@ const props = defineProps({
 const messageInput = ref("");
 const lastSendTime = ref(0);
 
-watch(messageInput, (newVal) => {
-  const lines = newVal.split('\n');
-  if (lines.length > 50) {
-    messageInput.value = lines.slice(0, 50).join('\n');
-    showToast("输入不能超过 50 行", "error");
-  }
-});
-
 const inputHeight = ref(150);
 let isResizingInput = false;
 
@@ -484,8 +476,8 @@ function sendMsg() {
   }
   lastSendTime.value = now;
 
-  if (content.length > 2000) {
-    if (window.confirm("文本过长(超过2000字符)，是否将其转换为文件发送？")) {
+  if (content.length > 2000 || content.split('\n').length > 100) {
+    if (window.confirm("文本过长(超过2000字符或100行)，是否将其转换为文件发送？")) {
       const isLatex = useLatexForCurrentMessage.value;
       const filename = isLatex ? "message.md" : "message.txt";
       
