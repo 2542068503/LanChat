@@ -95,7 +95,13 @@ async fn listen_loop(
         let (len, src_addr) = tokio_socket.recv_from(&mut buf).await?;
         let data = &buf[..len];
 
-        if let Ok(envelope) = Envelope::from_encrypted_bytes(data) {
+        if let Ok((envelope, is_old)) = Envelope::from_encrypted_bytes(data) {
+            let client_version = envelope.app_version.clone().unwrap_or_else(|| "1.0.0".to_string());
+            if is_old || envelope.v != 2 || !crate::state::is_version_allowed(&client_version) {
+                // Ignore old packets and packets from versions that are too low
+                continue;
+            }
+            
             // Envelope verification is already done inside from_encrypted_bytes
             match envelope.msg_type.as_str() {
                 "heartbeat" => {

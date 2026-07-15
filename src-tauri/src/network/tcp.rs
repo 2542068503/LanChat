@@ -138,14 +138,39 @@ async fn handle_new_connection(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Read the first frame to determine the connection type
     let first_frame = framing::read_frame(&mut stream).await?;
-    let envelope = Envelope::from_encrypted_bytes(&first_frame)?;
+    let (envelope, is_old_protocol) = Envelope::from_encrypted_bytes(&first_frame)?;
 
-    if envelope.v != 1 {
-        return Err("Unsupported protocol version".into());
+    let client_version = envelope.app_version.clone().unwrap_or_else(|| "1.0.0".to_string());
+
+    if is_old_protocol || !crate::state::is_version_allowed(&client_version) {
+        let reject_msg = ChatMessagePayload {
+            message_id: Uuid::new_v4(),
+            sender_id: Uuid::nil(),
+            content_type: "text".to_string(),
+            content: "【系统提示】您的版本过低，已被系统禁止访问机房网络。请更新到最新版本。".to_string(),
+            timestamp: chrono::Utc::now().timestamp_millis(),
+            file_info: None,
+            render_latex: None,
+            quote_msg_id: None,
+            quote_sender: None,
+            quote_content: None,
+        };
+        
+        let reject_envelope = if is_old_protocol {
+            Envelope::new_system_old("chat", &reject_msg)?
+        } else {
+            Envelope::new("chat", &reject_msg)?
+        };
+        
+        if let Ok(frame_bytes) = reject_envelope.to_encrypted_bytes() {
+            let _ = framing::write_frame(&mut stream, &frame_bytes).await;
+        }
+        
+        return Err("Connection rejected: Peer version too low".into());
     }
 
-    if !envelope.verify() {
-        return Err("Security signature verification failed".into());
+    if envelope.v != 2 {
+        return Err("Unsupported protocol version".into());
     }
 
     if envelope.msg_type == "file_request" {
@@ -206,8 +231,8 @@ async fn chat_read_loop(
     loop {
         match framing::read_frame(&mut read_half).await {
             Ok(frame_bytes) => {
-                let envelope = Envelope::from_encrypted_bytes(&frame_bytes)?;
-                if envelope.v == 1 && envelope.verify() && envelope.msg_type == "chat" {
+                let (envelope, is_old) = Envelope::from_encrypted_bytes(&frame_bytes)?;
+                if !is_old && envelope.v == 2 && envelope.msg_type == "chat" {
                     let chat_payload: ChatMessagePayload =
                         serde_json::from_value(envelope.payload)?;
                     handle_incoming_message(&app_handle, &state, chat_payload);

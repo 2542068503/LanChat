@@ -96,30 +96,20 @@
 
         <div class="settings-divider"></div>
         
-        <div class="setting-item">
-          <div class="setting-info">
-            <h4>快捷键 Ctrl+W 关闭窗口</h4>
-            <p>开启后可以使用 Ctrl+W 快捷键关闭主窗口（最小化到托盘）</p>
-          </div>
-          <div class="setting-action">
-            <label class="switch">
-              <input type="checkbox" v-model="enableCtrlWClose" @change="saveCtrlWClose">
-              <span class="slider round"></span>
-            </label>
-          </div>
+        <div class="settings-field">
+          <label class="settings-label">关闭窗口快捷键</label>
+          <label class="latex-toggle">
+            <input type="checkbox" v-model="enableCtrlWClose" @change="saveCtrlWClose">
+            <span class="latex-toggle-text">使用 Ctrl+W 快捷键关闭主窗口（最小化到托盘）</span>
+          </label>
         </div>
         
-        <div class="setting-item">
-          <div class="setting-info">
-            <h4>启用 Ctrl+Tab 快捷键切换联系人</h4>
-            <p>使用 Ctrl+Tab 和 Ctrl+Shift+Tab 在好友列表间快速切换</p>
-          </div>
-          <div class="setting-action">
-            <label class="switch">
-              <input type="checkbox" v-model="enableCtrlTabSwitch" @change="saveCtrlTabSwitch">
-              <span class="slider round"></span>
-            </label>
-          </div>
+        <div class="settings-field">
+          <label class="settings-label">切换联系人快捷键</label>
+          <label class="latex-toggle">
+            <input type="checkbox" v-model="enableCtrlTabSwitch" @change="saveCtrlTabSwitch">
+            <span class="latex-toggle-text">使用 Ctrl+Tab 和 Ctrl+Shift+Tab 在列表间切换</span>
+          </label>
         </div>
 
         <div class="settings-divider"></div>

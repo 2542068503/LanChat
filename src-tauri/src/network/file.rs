@@ -317,9 +317,9 @@ async fn download_task(
 
     // 5. Read Handshake Response
     let resp_bytes = framing::read_frame(&mut stream).await?;
-    let resp_envelope = Envelope::from_encrypted_bytes(&resp_bytes)?;
+    let (resp_envelope, _) = Envelope::from_encrypted_bytes(&resp_bytes)?;
 
-    if resp_envelope.v != 1 || resp_envelope.msg_type != "file_response" {
+    if resp_envelope.v != 2 || resp_envelope.msg_type != "file_response" {
         return Err("Invalid file handshake response".into());
     }
 
@@ -357,9 +357,9 @@ async fn download_task(
     while bytes_downloaded < file_size {
         // Read metadata frame for chunk
         let chunk_meta_bytes = framing::read_frame(&mut stream).await?;
-        let chunk_envelope = Envelope::from_encrypted_bytes(&chunk_meta_bytes)?;
+        let (chunk_envelope, _) = Envelope::from_encrypted_bytes(&chunk_meta_bytes)?;
 
-        if chunk_envelope.v != 1 || chunk_envelope.msg_type != "file_chunk" {
+        if chunk_envelope.v != 2 || chunk_envelope.msg_type != "file_chunk" {
             return Err("Invalid file chunk header".into());
         }
 

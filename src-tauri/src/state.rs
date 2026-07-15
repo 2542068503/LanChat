@@ -7,6 +7,24 @@ use std::time::Instant;
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
+pub const MIN_ALLOWED_VERSION: &str = "2.0.0";
+
+pub fn is_version_allowed(client_version: &str) -> bool {
+    // Parse version like "1.5.0" into tuple (1, 5, 0)
+    let parse_ver = |v: &str| -> (u32, u32, u32) {
+        let parts: Vec<&str> = v.split('.').collect();
+        let major = parts.get(0).unwrap_or(&"0").parse().unwrap_or(0);
+        let minor = parts.get(1).unwrap_or(&"0").parse().unwrap_or(0);
+        let patch = parts.get(2).unwrap_or(&"0").parse().unwrap_or(0);
+        (major, minor, patch)
+    };
+
+    let client_ver = parse_ver(client_version);
+    let min_ver = parse_ver(MIN_ALLOWED_VERSION);
+
+    client_ver >= min_ver
+}
+
 #[derive(Debug, Clone)]
 pub struct PeerInfo {
     pub payload: HeartbeatPayload,
