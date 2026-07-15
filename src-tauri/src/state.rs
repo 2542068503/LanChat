@@ -7,7 +7,7 @@ use std::time::Instant;
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
-pub const MIN_ALLOWED_VERSION: &str = "2.0.0";
+pub const MIN_ALLOWED_VERSION: &str = "2.0.1";
 
 pub fn is_version_allowed(client_version: &str) -> bool {
     // Parse version like "1.5.0" into tuple (1, 5, 0)

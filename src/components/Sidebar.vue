@@ -118,7 +118,8 @@ async function refreshNetwork() {
   isRefreshing.value = true;
   try {
     await invoke('refresh_discovery');
-    showToast("已广播刷新请求", "success");
+    await invoke('scan_subnets');
+    showToast("已广播刷新请求并扫描网段", "success");
   } catch (e: any) {
     showToast("刷新失败: " + e, "error");
   } finally {

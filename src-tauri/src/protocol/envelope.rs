@@ -87,3 +87,29 @@ impl Envelope {
         Ok((env, is_v1))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::heartbeat::HeartbeatPayload;
+
+    #[test]
+    fn test_signature_stability() {
+        let payload = HeartbeatPayload {
+            id: uuid::Uuid::new_v4(),
+            username: "test".to_string(),
+            tcp_port: 8080,
+            avatar_id: 1,
+            avatar_base64: None,
+            os: "windows".to_string(),
+            app_state: Some("active".to_string()),
+            version: Some("2.0.0".to_string()),
+        };
+
+        let env = Envelope::new("heartbeat", &payload).unwrap();
+        let bytes = env.to_encrypted_bytes().unwrap();
+        let (decoded, _) = Envelope::from_encrypted_bytes(&bytes).unwrap();
+        
+        assert!(decoded.verify());
+    }
+}
