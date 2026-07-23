@@ -115,8 +115,8 @@ async fn handle_file_request_impl(
     let frame_bytes = envelope.to_encrypted_bytes()?;
     framing::write_frame(&mut stream, &frame_bytes).await?;
 
-    // 4. Stream file chunks (4MB each)
-    const CHUNK_SIZE: usize = 4 * 1024 * 1024;
+    // 4. Stream file chunks (64KB each)
+    const CHUNK_SIZE: usize = 64 * 1024;
     let mut buffer = vec![0u8; CHUNK_SIZE];
     let mut current_offset = start_offset;
     let mut chunk_index = (start_offset / CHUNK_SIZE as u64) as u64;
@@ -303,7 +303,12 @@ async fn download_task(
 
     // 3. Connect to sender TCP port
     let dest_addr = format!("{}:{}", peer_ip, peer_port);
-    let mut stream = TcpStream::connect(&dest_addr).await?;
+    let stream_res = tokio::time::timeout(std::time::Duration::from_secs(5), TcpStream::connect(&dest_addr)).await;
+    let mut stream = match stream_res {
+        Ok(Ok(s)) => s,
+        Ok(Err(e)) => return Err(e.into()),
+        Err(_) => return Err("Connection timed out".into()),
+    };
     let _ = stream.set_nodelay(true);
 
     // 4. Send File Request

@@ -158,12 +158,11 @@
                 @keydown.enter.exact="handleEnter"
                 @keydown.ctrl.enter="handleNewLine"
                 style="height: 100%;"
-                maxlength="2000"
               ></textarea>
           </div>
           <div class="input-footer" style="display: flex; justify-content: flex-end; align-items: center; padding-top: 8px;">
-            <span style="font-size: 11px; color: var(--text-secondary); opacity: 0.7; margin-right: 12px;" :style="{ color: messageInput.length >= 2000 ? '#ef4444' : '' }">
-              {{ messageInput.length }} / 2000
+            <span style="font-size: 11px; color: var(--text-secondary); opacity: 0.7; margin-right: 12px;" :style="{ color: messageInput.length > 2000 || messageInput.split('\n').length > 100 ? '#8b5cf6' : '' }">
+              {{ messageInput.length }}{{ messageInput.length > 2000 || messageInput.split('\n').length > 100 ? ' (将作为文件发送)' : '' }}
             </span>
             <button class="send-btn" @click="sendMsg" :disabled="!messageInput.trim()">发送</button>
           </div>

@@ -59,19 +59,31 @@ async fn run_scan(
     for ip in local_ips {
         let octets = ip.octets();
 
-        // Fast scan the entire /16 (65535 IPs) using concurrent tasks per /24
-        // Reorder to scan the local subnet first for faster immediate discovery
-        let mut thirds: Vec<u8> = (0..=255u8).collect();
-        thirds.retain(|&x| x != octets[2]);
-        thirds.insert(0, octets[2]);
+        // Scan the current /24 subnet and +/- 3 subnets (total 7 subnets)
+        let mut thirds: Vec<u8> = Vec::new();
+        thirds.push(octets[2]);
 
-        for third in thirds {
-            let udp_clone = udp.clone();
-            let bytes_clone = heartbeat_bytes.clone();
-            let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let start = octets[2].saturating_sub(3);
+        let end = octets[2].saturating_add(3);
 
-            tasks.push(tokio::spawn(async move {
-                let _permit = permit; // Drop permit when task completes
+        for t in start..=end {
+            if t != octets[2] {
+                thirds.push(t);
+            }
+        }
+
+        // To avoid dropping packets and network congestion, we serialize the scan
+        // for each interface, putting a 15ms delay between each packet.
+        // 7 subnets * 254 hosts = 1778 packets. 1778 * 15ms = 26.6 seconds.
+        // This perfectly fits inside the 30-second scan interval.
+        let udp_clone = udp.clone();
+        let bytes_clone = heartbeat_bytes.clone();
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
+
+        tasks.push(tokio::spawn(async move {
+            let _permit = permit;
+
+            for third in thirds {
                 // Send directed broadcast to this /24 subnet first
                 let bcast_ip = Ipv4Addr::new(octets[0], octets[1], third, 255);
                 let bcast_dest = SocketAddr::from((bcast_ip, DISCOVERY_PORT));
@@ -81,10 +93,8 @@ async fn run_scan(
                     let target_ip = Ipv4Addr::new(octets[0], octets[1], third, host);
                     let dest = SocketAddr::from((target_ip, DISCOVERY_PORT));
 
-                    // Yield occasionally to prevent flooding OS UDP buffers
-                    if host % 16 == 0 {
-                        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
-                    }
+                    // Fixed 15ms delay for EVERY packet to perfectly pace the 1778 packets over ~26s
+                    tokio::time::sleep(std::time::Duration::from_millis(15)).await;
 
                     let mut retries = 0;
                     while let Err(e) = udp_clone.send_to(&bytes_clone, &dest).await {
@@ -101,8 +111,8 @@ async fn run_scan(
                         }
                     }
                 }
-            }));
-        }
+            }
+        }));
     }
 
     // Wait for all /24 subnet sweep tasks to complete

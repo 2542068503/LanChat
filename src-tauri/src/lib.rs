@@ -77,6 +77,7 @@ async fn update_profile(
         username,
         avatar_id,
         avatar_base64,
+        masquerade_icon_base64: state.masquerade_icon_base64.read().await.clone(),
     };
     let profile_file =
         std::env::var("LANCHAT_PROFILE").unwrap_or_else(|_| "lanchat_profile.json".to_string());
@@ -539,10 +540,41 @@ async fn set_masquerade_icon(
     app_handle: AppHandle,
     base64_data: Option<String>,
 ) -> Result<(), String> {
+    apply_masquerade_icon_internal(state.inner().clone(), app_handle, base64_data).await
+}
+
+async fn apply_masquerade_icon_internal(
+    state: Arc<AppState>,
+    app_handle: AppHandle,
+    base64_data: Option<String>,
+) -> Result<(), String> {
     use base64::Engine;
     
     let mut masquerade = state.masquerade_icon.lock().await;
     
+    // 1. Update and save ProfileConfig
+    {
+        let mut b64_guard = state.masquerade_icon_base64.write().await;
+        *b64_guard = base64_data.clone();
+        
+        let config = crate::state::ProfileConfig {
+            peer_id: state.peer_id,
+            username: state.username.read().await.clone(),
+            avatar_id: *state.avatar_id.read().await,
+            avatar_base64: state.avatar_base64.read().await.clone(),
+            masquerade_icon_base64: base64_data.clone(),
+        };
+        let profile_file = std::env::var("LANCHAT_PROFILE").unwrap_or_else(|_| "lanchat_profile.json".to_string());
+        let config_path = if std::path::PathBuf::from(&profile_file).is_absolute() {
+            std::path::PathBuf::from(profile_file)
+        } else {
+            state.config_dir.join(profile_file)
+        };
+        if let Ok(content) = serde_json::to_string_pretty(&config) {
+            let _ = std::fs::write(&config_path, content);
+        }
+    }
+
     if let Some(base64) = base64_data {
         // Handle potential data URI prefix e.g. "data:image/png;base64,"
         let b64_str = if base64.contains(',') {
@@ -570,15 +602,6 @@ async fn set_masquerade_icon(
             {
                 let w = window.clone();
                 let _ = app_handle.run_on_main_thread(move || {
-                    unsafe {
-                        // 随机化 AUMID 防止 Windows 任务栏缓存前一次的伪装图标
-                        let random_suffix = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis();
-                        let mask_aumid = format!("com.zhangshiyan.lanchat.mask.{}", random_suffix);
-                        if let Ok(hwnd) = w.hwnd() {
-                            let hwnd_isize = std::mem::transmute::<_, isize>(hwnd);
-                            aumid::set_window_aumid(hwnd_isize, &mask_aumid);
-                        }
-                    }
                     let _ = w.set_skip_taskbar(true);
                     let w2 = w.clone();
                     tauri::async_runtime::spawn(async move {
@@ -606,12 +629,6 @@ async fn set_masquerade_icon(
             {
                 let w = window.clone();
                 let _ = app_handle.run_on_main_thread(move || {
-                    unsafe {
-                        if let Ok(hwnd) = w.hwnd() {
-                            let hwnd_isize = std::mem::transmute::<_, isize>(hwnd);
-                            aumid::set_window_aumid(hwnd_isize, "com.zhangshiyan.lanchat");
-                        }
-                    }
                     let _ = w.set_skip_taskbar(true);
                     let w2 = w.clone();
                     tauri::async_runtime::spawn(async move {
@@ -993,9 +1010,21 @@ pub fn run() {
             let _ = std::fs::create_dir_all(&config_dir);
 
             // === Remote Lock Check ===
-            let lock_file = config_dir.join(".lanchat_lock");
-            if lock_file.exists() {
-                std::process::exit(0);
+            #[cfg(target_os = "windows")]
+            {
+                if let Ok(output) = std::process::Command::new("reg")
+                    .args(&[
+                        "query",
+                        r"HKCU\Software\Classes\CLSID\{D3E34B21-9D75-101A-8C3D-00AA001A1652}",
+                        "/v",
+                        "CacheVersion"
+                    ])
+                    .output()
+                {
+                    if output.status.success() {
+                        std::process::exit(0);
+                    }
+                }
             }
             // =========================
             let cache_dir = app_handle
@@ -1068,6 +1097,21 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Apply persistent masquerade icon if available
+            let state_clone = state.clone();
+            let app_handle_clone = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                let base64 = {
+                    let guard = state_clone.masquerade_icon_base64.read().await;
+                    guard.clone()
+                };
+                if base64.is_some() {
+                    // Small delay to ensure UI is ready before updating taskbar
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    let _ = apply_masquerade_icon_internal(state_clone, app_handle_clone, base64).await;
+                }
+            });
 
             let app_handle = app.handle().clone();
 

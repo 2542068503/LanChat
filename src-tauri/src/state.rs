@@ -1,5 +1,6 @@
 use crate::protocol::heartbeat::HeartbeatPayload;
 use serde::{Deserialize, Serialize};
+use sha2::Digest;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -66,6 +67,8 @@ pub struct ProfileConfig {
     pub username: String,
     pub avatar_id: u8,
     pub avatar_base64: Option<String>,
+    #[serde(default)]
+    pub masquerade_icon_base64: Option<String>,
 }
 
 pub struct AppState {
@@ -84,6 +87,7 @@ pub struct AppState {
     pub config_dir: PathBuf,
     pub cache_dir: PathBuf,
     pub masquerade_icon: Mutex<Option<tauri::image::Image<'static>>>,
+    pub masquerade_icon_base64: RwLock<Option<String>>,
 }
 
 impl AppState {
@@ -129,6 +133,7 @@ impl AppState {
             config_dir,
             cache_dir,
             masquerade_icon: Mutex::new(None),
+            masquerade_icon_base64: RwLock::new(config.masquerade_icon_base64),
         }
     }
 
@@ -193,13 +198,44 @@ impl AppState {
         HashMap::new()
     }
 
+    fn get_machine_uuid() -> String {
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(output) = std::process::Command::new("wmic")
+                .args(&["csproduct", "get", "uuid"])
+                .output()
+            {
+                let s = String::from_utf8_lossy(&output.stdout);
+                let lines: Vec<&str> = s.lines().collect();
+                if lines.len() >= 2 {
+                    let uuid_str = lines[1].trim();
+                    if !uuid_str.is_empty() && uuid_str != "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF" {
+                        return uuid_str.to_string();
+                    }
+                }
+            }
+        }
+        std::env::var("COMPUTERNAME").unwrap_or_else(|_| "UnknownHost".to_string())
+    }
+
     fn default_config() -> ProfileConfig {
-        let unique_id = Uuid::new_v4();
+        let hw_id = Self::get_machine_uuid();
+        let mut hasher = sha2::Sha256::new();
+        sha2::Digest::update(&mut hasher, hw_id.as_bytes());
+        let result = sha2::Digest::finalize(hasher);
+        
+        let mut bytes = [0u8; 16];
+        bytes.copy_from_slice(&result[0..16]);
+        bytes[6] = (bytes[6] & 0x0f) | 0x40; // Version 4
+        bytes[8] = (bytes[8] & 0x3f) | 0x80; // Variant RFC4122
+        
+        let unique_id = Uuid::from_bytes(bytes);
         ProfileConfig {
             peer_id: unique_id,
             username: format!("用户-{}", &unique_id.to_string()[..4]),
             avatar_id: 1,
             avatar_base64: None,
+            masquerade_icon_base64: None,
         }
     }
 }

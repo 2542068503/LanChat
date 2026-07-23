@@ -167,6 +167,7 @@
             <div class="network-value highlight">{{ selfInfo.hostname || 'Unknown' }}</div>
           </div>
           <div>
+            <div class="network-label">监听端口</div>
             <div class="network-value highlight">{{ selfInfo.tcpPort || '0' }}</div>
           </div>
         </div>

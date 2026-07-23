@@ -335,7 +335,7 @@ async fn cleanup_loop(app_handle: AppHandle, state: Arc<AppState>) {
             let timeout = if info.payload.app_state.as_deref() == Some("background") {
                 Duration::from_secs(3600) // 1 hour for background apps (OS suspends them)
             } else {
-                Duration::from_secs(45) // 45 seconds for active apps
+                Duration::from_secs(90) // 90 seconds for active apps (to account for ~30s scan cycles)
             };
 
             if info.is_online && now.duration_since(info.last_seen) > timeout {
