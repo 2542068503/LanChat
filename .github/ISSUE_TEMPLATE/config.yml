@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 GitHub Discussions
+    url: https://github.com/2542068503/LanChat/discussions
+    about: Ask questions, share ideas, and connect with other users.
+  - name: 🔒 Security Advisory
+    url: mailto:zsy2542068503@163.com
+    about: Report security vulnerabilities privately.

@@ -1,0 +1,35 @@
+name: 💡 Feature Request / 功能建议
+description: Suggest an idea or feature for LanChat
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature for LanChat! Please describe your use case and idea below.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Motivation / 需求背景
+      description: Is your feature request related to a problem or specific workflow limitation?
+      placeholder: Describe the problem...
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution / 方案设想
+      description: What would you like to see implemented?
+      placeholder: Describe the solution you'd like...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered / 备选方案
+      description: Describe any alternative solutions or features you've considered.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context / 补充说明
+      description: Add any mockups, screenshots, or protocol considerations here.
