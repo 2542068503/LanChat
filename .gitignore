@@ -37,3 +37,8 @@ dist-ssr
 /.codegraph/
 /.reasonix/
 /skills-lock.json
+
+# Local test profiles and debug files
+*profile*.json
+peers*.json
+test_*.rs
