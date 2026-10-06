@@ -1,4 +1,5 @@
 #[cfg(target_os = "windows")]
+#[allow(dead_code)]
 pub unsafe fn set_window_aumid(hwnd: isize, aumid: &str) {
     use std::ffi::c_void;
     use windows::core::{GUID, PWSTR};

@@ -40,3 +40,33 @@ pub fn decrypt(data: &[u8]) -> Result<Vec<u8>, String> {
         Err(e) => Err(format!("Decryption failed: {}", e)),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encrypt_decrypt_roundtrip() {
+        let original = b"Hello LanChat Open Source World! \xf0\x9f\x9a\x80";
+        let encrypted = encrypt(original).expect("encryption should succeed");
+        assert_ne!(encrypted.as_slice(), original);
+        let decrypted = decrypt(&encrypted).expect("decryption should succeed");
+        assert_eq!(decrypted.as_slice(), original);
+    }
+
+    #[test]
+    fn test_decrypt_too_short() {
+        let short = vec![1, 2, 3];
+        assert!(decrypt(&short).is_err());
+    }
+
+    #[test]
+    fn test_decrypt_tampered_ciphertext() {
+        let original = b"Secret payload";
+        let mut encrypted = encrypt(original).expect("encryption should succeed");
+        if let Some(last) = encrypted.last_mut() {
+            *last ^= 0xff; // tamper last byte
+        }
+        assert!(decrypt(&encrypted).is_err());
+    }
+}
